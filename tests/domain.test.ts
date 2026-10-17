@@ -11,6 +11,7 @@ import { computeProjectTotals, aggregateFundingByInvestor } from "@/lib/domain/p
 import { formatRupiah, toNum, pad, formatPorsi, parseMoneyInput } from "@/lib/domain/money";
 import { toDateString, nowStr, todayStr } from "@/lib/domain/dates";
 import { canWrite, hasRole, isAdmin, isClient, rolesReadInternal, rolesWrite } from "@/lib/domain/permissions";
+import { computeLedgerTotals } from "@/lib/domain/ledger-totals";
 import { legacyHashPassword, verifyPassword } from "@/lib/auth/password";
 
 describe("allocateProRata", () => {
@@ -214,6 +215,32 @@ describe("peran (permissions) — sama dengan aplikasi lama", () => {
     expect(isClient("client")).toBe(true);
     expect(hasRole("investor", rolesReadInternal)).toBe(true);
     expect(hasRole("client", rolesReadInternal)).toBe(false);
+  });
+});
+
+describe("ringkasan ledger proyek (Debet/Kredit)", () => {
+  it("memisahkan total debet dan kredit serta menghitung selisih", () => {
+    const totals = computeLedgerTotals([
+      { jenis: "Debet", nominal: 1_500_000 },
+      { jenis: "Kredit", nominal: 500_000 },
+      { jenis: "Debet", nominal: 250_000 },
+    ]);
+    expect(totals.debet).toBe(1_750_000);
+    expect(totals.kredit).toBe(500_000);
+    expect(totals.selisih).toBe(1_250_000);
+  });
+
+  it("nilai kosong / jenis tak dikenal diperlakukan sebagai Debet", () => {
+    const totals = computeLedgerTotals([
+      { jenis: "", nominal: "" },
+      { jenis: "Debet", nominal: "1000" },
+    ]);
+    expect(totals.debet).toBe(1000);
+    expect(totals.kredit).toBe(0);
+  });
+
+  it("daftar kosong -> semua nol", () => {
+    expect(computeLedgerTotals([])).toEqual({ debet: 0, kredit: 0, selisih: 0 });
   });
 });
 

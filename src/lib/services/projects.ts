@@ -21,6 +21,7 @@ import { AppError } from "@/lib/errors";
 import { logAudit } from "./audit";
 import { nextId } from "./ids";
 import { loadBalances } from "./ledger";
+import { listProjectLedgers, type ProjectLedgerDTO } from "./project-ledgers";
 
 /* ============================== TIPE ============================== */
 
@@ -86,6 +87,8 @@ export interface ProjectDetailDTO {
   fundings: FundingDTO[];
   transactions: ProjectTransactionDTO[];
   distributions: DistributionDTO[];
+  /** Ledger proyek (fitur baru) — read-only untuk admin/operator. */
+  ledgers: ProjectLedgerDTO[];
   availableInvestors: AvailableInvestorDTO[];
 }
 
@@ -245,6 +248,7 @@ export async function getProjectDetail(projectId: string): Promise<ProjectDetail
     db.select().from(profitDistributions).where(eq(profitDistributions.projectId, projectId)),
     loadBalances(),
   ]);
+  const ledgers = await listProjectLedgers(projectId);
 
   const nameById = new Map(invRows.map((i) => [i.id, i.nama]));
   const investorName = (id: string) => nameById.get(id) ?? "(tidak diketahui)";
@@ -275,6 +279,7 @@ export async function getProjectDetail(projectId: string): Promise<ProjectDetail
       jumlahLaba: toNum(d.jumlahLaba),
       tanggal: toDateString(d.tanggal),
     })),
+    ledgers,
     availableInvestors: invRows.map((i) => {
       const b = balances.find((x) => String(x.id) === String(i.id));
       return {

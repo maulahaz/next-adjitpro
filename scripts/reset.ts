@@ -26,6 +26,7 @@ async function main() {
     "login_attempts",
     "profit_distributions",
     "project_transactions",
+    "project_ledgers",
     "project_funding",
     "capital_transactions",
     "projects",

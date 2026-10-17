@@ -43,6 +43,12 @@ export const TIPE = {
   BIAYA: "Biaya",
 } as const;
 
+/** Jenis entri ledger proyek (fitur baru; tidak ada di aplikasi lama). */
+export const LEDGER_TIPE = {
+  DEBET: "Debet",
+  KREDIT: "Kredit",
+} as const;
+
 export const ROLES = {
   ADMIN: "admin",
   OPERATOR: "operator",
@@ -53,6 +59,7 @@ export const ROLES = {
 export type Role = (typeof ROLES)[keyof typeof ROLES];
 export type ProjectStatus = (typeof STATUS)[keyof typeof STATUS];
 export type Tipe = (typeof TIPE)[keyof typeof TIPE];
+export type LedgerTipe = (typeof LEDGER_TIPE)[keyof typeof LEDGER_TIPE];
 
 /** Prefix ID otomatis per entitas — port dari `ID_PREFIX`. */
 export const ID_PREFIX = {
@@ -86,6 +93,7 @@ export const PROJECT_STATUSES = ["Draft", "Berjalan", "Selesai", "Ditutup"] as c
 export const FUNDING_STATUSES = ["Aktif", "Dibebaskan"] as const;
 export const CAPITAL_TIPES = ["Setor", "Tarik"] as const;
 export const PROJECT_TIPES = ["Pendapatan", "Biaya"] as const;
+export const LEDGER_TIPES = ["Debet", "Kredit"] as const;
 export const ROLE_VALUES = ["admin", "operator", "investor", "client"] as const;
 
 function numEnv(key: string, fallback: number): number {

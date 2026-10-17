@@ -22,7 +22,8 @@ Drizzle ORM · Tailwind CSS 3 · shadcn/ui · Vitest.
 | **Laporan** | Rekap investor, rekap proyek, riwayat bagi hasil, **export CSV**, dan **cetak**. |
 | **Pengguna** | Kelola akun (khusus admin): peran, tautan ke investor/pihak ketiga, reset password, aktif/nonaktif. |
 | **Kartu Saya** | Halaman investor: statement dirinya sendiri. |
-| **Proyek Saya** | Halaman client: daftar proyek milik pihak ketiganya — **tanpa data keuangan**. |
+| **Proyek Saya** | Halaman client: daftar proyek milik pihak ketiganya, dengan tautan **Buka Ledger** per proyek. |
+| **Ledger Proyek** | Ledger **Debet/Kredit** per proyek (fitur baru, bukan dari aplikasi lama). **Hanya peran `client`** yang dapat menambah/ubah/menghapus entri — dan hanya untuk proyek milik pihak ketiganya. Peran lain hanya **membaca** (read-only) di detail proyek. |
 | **Ganti Password** | Setiap pengguna dapat mengganti password sendiri (wajib tahu password lama). |
 
 ### Aturan bisnis inti (sama persis dengan aplikasi lama)
@@ -46,12 +47,15 @@ Drizzle ORM · Tailwind CSS 3 · shadcn/ui · Vitest.
 | --- | :-: | :-: | :-: | :-: |
 | Dashboard | ✔ | ✔ | ✔ (data sendiri) | ✖ |
 | Kartu Saya | ✖ | ✖ | ✔ | ✖ |
-| Proyek Saya | ✖ | ✖ | ✖ | ✔ (tanpa keuangan) |
+| Proyek Saya | ✖ | ✖ | ✖ | ✔ (proyek sendiri) |
+| Ledger Proyek | ✔ (baca, di detail proyek) | ✔ (baca, di detail proyek) | ✖ | ✔ (CRUD, proyek sendiri) |
 | Investor / Proyek / Mutasi Modal / Bagi Hasil / Laporan / Pihak Ketiga | ✔ | ✔ | ✖ | ✖ |
 | Pengguna | ✔ | ✖ | ✖ | ✖ |
 | Ganti Password | ✔ | ✔ | ✔ | ✔ |
 
 Semua pemeriksaan hak akses dilakukan **di server** (bukan hanya menyembunyikan menu).
+**Pengecualian satu-satunya** untuk operasi tulis oleh client adalah modul **Ledger
+Proyek** — ditegakkan di server dan dibatasi hanya untuk proyek milik pihak ketiganya.
 
 ---
 
@@ -142,6 +146,9 @@ next-adjitpro/
 
 Perbedaan teknis yang disengaja:
 
+- **Ledger Proyek** adalah modul **baru** (tidak ada di aplikasi lama) sehingga
+  memakai primary key `serial` (auto increment) alih-alih format ID teks lama;
+  akses tulisnya khusus peran `client` untuk proyek miliknya.
 - Sesi disimpan di tabel + cookie `httpOnly` `adjitpro_session` (bukan `CacheService`),
   agar konsisten di lingkungan serverless dan bisa dicabut saat logout.
 - Password lama (`sha256(salt + "::" + password)`) **tetap bisa login** dan otomatis
@@ -154,7 +161,7 @@ Perbedaan teknis yang disengaja:
 ## 6. Pengujian
 
 ```powershell
-npm test          # 31 uji: 21 logika murni + 10 integrasi PostgreSQL
+npm test          # 35 uji: 24 logika murni + 11 integrasi PostgreSQL
 ```
 
 Uji integrasi otomatis dilewati bila `DATABASE_URL` tidak tersedia, sehingga

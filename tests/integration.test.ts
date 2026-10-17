@@ -19,6 +19,7 @@ import { saveThirdParty } from "@/lib/services/third-parties";
 import { saveProject, addFunding, addProjectTransaction, listProjectsEnriched } from "@/lib/services/projects";
 import { addCapitalTransaction, distributeProfit, closeProject } from "@/lib/services/finance";
 import { loadBalances } from "@/lib/services/ledger";
+import { listProjectLedgers, saveProjectLedger, deleteProjectLedger } from "@/lib/services/project-ledgers";
 import { getDashboardScoped, listProjectsForClient, getInvestorStatement } from "@/lib/services/reports";
 import { saveUser, ensureDefaultAdmin, changeOwnPassword } from "@/lib/services/users";
 import { login } from "@/lib/services/auth";
@@ -28,7 +29,7 @@ import { ROLES } from "@/lib/constants";
 const hasDb = Boolean(process.env.DATABASE_URL);
 
 const TRUNCATE = `TRUNCATE TABLE audit_log, sessions, login_attempts, profit_distributions,
-  project_transactions, project_funding, capital_transactions, projects, third_parties,
+  project_transactions, project_ledgers, project_funding, capital_transactions, projects, third_parties,
   investors, users, counters RESTART IDENTITY CASCADE`;
 
 describe.skipIf(!hasDb)("integrasi: alur keuangan lengkap", () => {
@@ -216,6 +217,76 @@ describe.skipIf(!hasDb)("integrasi: alur keuangan lengkap", () => {
     // Daftar investor tetap konsisten.
     const invs = await listInvestors();
     expect(invs.length).toBeGreaterThan(0);
+  });
+});
+
+describe.skipIf(!hasDb)("integrasi: ledger proyek (client)", () => {
+  beforeAll(async () => {
+    await getSql().unsafe(TRUNCATE);
+    await ensureDefaultAdmin();
+  });
+
+  it("client CRUD hanya pada proyek milik pihak ketiganya", async () => {
+    const tp = await saveThirdParty({ nama: "PT Ledger" }, "test");
+    const otherTp = await saveThirdParty({ nama: "PT Lain" }, "test");
+    const project = await saveProject({ nama: "Proyek Ledger", pihakKetigaId: tp.id }, "test");
+    const otherProject = await saveProject({ nama: "Proyek Lain", pihakKetigaId: otherTp.id }, "test");
+
+    // CREATE
+    const entry = await saveProjectLedger(
+      { projectId: project.id, tanggal: "2026-01-02", jenis: "Debet", nominal: 1500000, keterangan: "modal kerja" },
+      "client1",
+      { thirdPartyId: tp.id },
+    );
+    expect(entry.jenis).toBe("Debet");
+    expect(entry.nominal).toBe(1500000);
+    expect(entry.tanggal).toBe("2026-01-02");
+
+    let rows = await listProjectLedgers(project.id);
+    expect(rows).toHaveLength(1);
+
+    // UPDATE (jenis & nominal)
+    const updated = await saveProjectLedger(
+      { id: entry.id, projectId: project.id, jenis: "Kredit", nominal: 500000, keterangan: "biaya" },
+      "client1",
+      { thirdPartyId: tp.id },
+    );
+    expect(updated.id).toBe(entry.id);
+    expect(updated.jenis).toBe("Kredit");
+    expect(updated.nominal).toBe(500000);
+
+    // Menulis ke proyek pihak ketiga lain DITOLAK.
+    await expect(
+      saveProjectLedger(
+        { projectId: otherProject.id, jenis: "Debet", nominal: 1000 },
+        "client1",
+        { thirdPartyId: tp.id },
+      ),
+    ).rejects.toThrow(/hak akses/);
+
+    // Nominal harus > 0.
+    await expect(
+      saveProjectLedger(
+        { projectId: project.id, jenis: "Debet", nominal: 0 },
+        "client1",
+        { thirdPartyId: tp.id },
+      ),
+    ).rejects.toThrow(/Nominal/);
+
+    // DELETE milik sendiri.
+    await deleteProjectLedger(entry.id, "client1", { thirdPartyId: tp.id });
+    rows = await listProjectLedgers(project.id);
+    expect(rows).toHaveLength(0);
+
+    // DELETE entri pihak ketiga lain DITOLAK.
+    const otherEntry = await saveProjectLedger(
+      { projectId: otherProject.id, jenis: "Debet", nominal: 2000 },
+      "client2",
+      { thirdPartyId: otherTp.id },
+    );
+    await expect(
+      deleteProjectLedger(otherEntry.id, "client1", { thirdPartyId: tp.id }),
+    ).rejects.toThrow(/hak akses/);
   });
 });
 

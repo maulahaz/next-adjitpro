@@ -150,6 +150,30 @@ export const projectTransactions = pgTable(
   (t) => ({ projectIdx: index("ptx_project_idx").on(t.projectId) }),
 );
 
+/* ====================== PROJECT LEDGER (BARU) ====================== */
+/**
+ * Ledger proyek — fitur baru (tidak ada di aplikasi lama).
+ *
+ * Kolom `id` memakai auto-increment (`serial`), bukan format teks lama,
+ * karena modul ini bukan bagian dari data yang dimigrasikan dari Sheets.
+ * CRUD hanya boleh dilakukan peran `client` untuk proyek miliknya.
+ */
+export const projectLedgers = pgTable(
+  "project_ledgers",
+  {
+    id: serial("id").primaryKey(),
+    projectId: text("project_id").notNull(),
+    tanggal: date("tanggal"),
+    /** 'Debet' | 'Kredit' */
+    jenis: text("jenis").notNull().default("Debet"),
+    /** Rupiah bulat (bilangan bulat). */
+    nominal: bigint("nominal", { mode: "number" }).notNull().default(0),
+    keterangan: text("keterangan").notNull().default(""),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({ projectIdx: index("pledger_project_idx").on(t.projectId) }),
+);
+
 /* ====================== PROFIT DISTRIBUTIONS ======================= */
 
 export const profitDistributions = pgTable(
@@ -226,6 +250,7 @@ export type ProjectRow = typeof projects.$inferSelect;
 export type CapitalTransactionRow = typeof capitalTransactions.$inferSelect;
 export type ProjectFundingRow = typeof projectFunding.$inferSelect;
 export type ProjectTransactionRow = typeof projectTransactions.$inferSelect;
+export type ProjectLedgerRow = typeof projectLedgers.$inferSelect;
 export type ProfitDistributionRow = typeof profitDistributions.$inferSelect;
 export type AuditLogRow = typeof auditLog.$inferSelect;
 export type SessionRow = typeof sessions.$inferSelect;

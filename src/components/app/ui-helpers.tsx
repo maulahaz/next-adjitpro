@@ -69,6 +69,8 @@ const STATUS_TONE: Record<string, { className: string; label?: string }> = {
   Tarik: { className: "bg-rose-600 text-white" },
   Pendapatan: { className: "bg-emerald-600 text-white" },
   Biaya: { className: "bg-rose-600 text-white" },
+  Debet: { className: "bg-emerald-600 text-white" },
+  Kredit: { className: "bg-rose-600 text-white" },
 };
 
 export function StatusPill({ status }: { status: string }) {

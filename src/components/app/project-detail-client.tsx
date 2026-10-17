@@ -33,7 +33,7 @@ const TIPE_OPTIONS = [
 ];
 
 export function ProjectDetailClient({ detail }: { detail: ProjectDetailDTO }) {
-  const { project, totals, fundings, transactions, distributions, availableInvestors } = detail;
+  const { project, totals, fundings, transactions, distributions, ledgers, availableInvestors } = detail;
 
   const locked = project.status === "Ditutup";
   const sudahDibagikan = totals.sudahDibagikan;
@@ -294,6 +294,49 @@ export function ProjectDetailClient({ detail }: { detail: ProjectDetailDTO }) {
                         </div>
                       </TableCell>
                     ) : null}
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Ledger Proyek — read-only untuk admin/operator; diisi oleh peran client */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Ledger Proyek ({ledgers.length})</CardTitle>
+        </CardHeader>
+        <CardContent className="p-0 sm:p-0">
+          {ledgers.length === 0 ? (
+            <div className="p-4">
+              <EmptyState message="Belum ada entri ledger. Entri diisi oleh peran client dari menu Proyek Saya." />
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Tanggal</TableHead>
+                  <TableHead>Jenis</TableHead>
+                  <TableHead>Keterangan</TableHead>
+                  <TableHead className="text-right">Nominal</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {ledgers.map((l) => (
+                  <TableRow key={l.id}>
+                    <TableCell>{displayDate(l.tanggal)}</TableCell>
+                    <TableCell>
+                      <StatusPill status={l.jenis} />
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">{l.keterangan || "-"}</TableCell>
+                    <TableCell
+                      className={`text-right tabular-nums ${
+                        l.jenis === "Kredit" ? "text-destructive" : "text-success"
+                      }`}
+                    >
+                      {formatRupiah(l.nominal)}
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>

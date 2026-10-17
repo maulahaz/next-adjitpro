@@ -218,7 +218,7 @@ async function main() {
     console.log("Mengosongkan tabel...");
     await sql.unsafe(
       `TRUNCATE TABLE audit_log, sessions, login_attempts, profit_distributions,
-       project_transactions, project_funding, capital_transactions, projects,
+       project_transactions, project_ledgers, project_funding, capital_transactions, projects,
        third_parties, investors, users, counters RESTART IDENTITY CASCADE`,
     );
   }

@@ -1,0 +1,187 @@
+"use client";
+
+import { Pencil, Plus, Trash2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Field, SelectInput } from "@/components/app/field";
+import { FormDialog, ConfirmDialog } from "@/components/app/form-dialog";
+import { EmptyState, StatCard, StatusPill } from "@/components/app/ui-helpers";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { saveLedgerAction, deleteLedgerAction } from "@/app/actions/project-ledgers";
+import { computeLedgerTotals } from "@/lib/domain/ledger-totals";
+import { formatRupiah } from "@/lib/domain/money";
+import { displayDate, todayStr } from "@/lib/domain/dates";
+import type { ProjectLedgerDTO } from "@/lib/services/project-ledgers";
+
+const JENIS_OPTIONS = [
+  { value: "Debet", label: "Debet" },
+  { value: "Kredit", label: "Kredit" },
+];
+
+/**
+ * Ledger proyek — panel CRUD untuk peran `client`.
+ * Otorisasi tetap ditegakkan di server (Server Action + service).
+ */
+export function ProjectLedgerClient({
+  projectId,
+  ledgers,
+}: {
+  projectId: string;
+  ledgers: ProjectLedgerDTO[];
+}) {
+  const totals = computeLedgerTotals(ledgers);
+
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+        <StatCard label="Total Debet" value={formatRupiah(totals.debet)} tone="positive" />
+        <StatCard label="Total Kredit" value={formatRupiah(totals.kredit)} tone="negative" />
+        <StatCard
+          label="Selisih (Debet − Kredit)"
+          value={formatRupiah(totals.selisih)}
+          tone={totals.selisih < 0 ? "negative" : "default"}
+        />
+      </div>
+
+      <Card>
+        <CardHeader className="flex-row items-center justify-between space-y-0">
+          <CardTitle>Ledger ({ledgers.length})</CardTitle>
+          <FormDialog
+            trigger={
+              <Button size="sm">
+                <Plus className="h-4 w-4" /> Entri Ledger
+              </Button>
+            }
+            title="Tambah Entri Ledger"
+            action={saveLedgerAction}
+          >
+            <LedgerFields projectId={projectId} />
+          </FormDialog>
+        </CardHeader>
+        <CardContent className="p-0 sm:p-0">
+          {ledgers.length === 0 ? (
+            <div className="p-4">
+              <EmptyState message="Belum ada entri ledger pada proyek ini." />
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Tanggal</TableHead>
+                  <TableHead>Jenis</TableHead>
+                  <TableHead>Keterangan</TableHead>
+                  <TableHead className="text-right">Nominal</TableHead>
+                  <TableHead className="text-right">Aksi</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {ledgers.map((l) => (
+                  <TableRow key={l.id}>
+                    <TableCell>{displayDate(l.tanggal)}</TableCell>
+                    <TableCell>
+                      <StatusPill status={l.jenis} />
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">{l.keterangan || "-"}</TableCell>
+                    <TableCell
+                      className={`text-right tabular-nums ${
+                        l.jenis === "Kredit" ? "text-destructive" : "text-success"
+                      }`}
+                    >
+                      {formatRupiah(l.nominal)}
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex justify-end gap-1">
+                        <FormDialog
+                          trigger={
+                            <Button variant="ghost" size="icon" aria-label="Ubah">
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                          }
+                          title="Ubah Entri Ledger"
+                          action={saveLedgerAction}
+                        >
+                          <LedgerFields projectId={projectId} entry={l} />
+                        </FormDialog>
+                        <ConfirmDialog
+                          trigger={
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              aria-label="Hapus"
+                              className="text-destructive"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          }
+                          title="Hapus Entri Ledger"
+                          description={`Hapus entri ${l.jenis} ${formatRupiah(l.nominal)}?`}
+                          action={deleteLedgerAction}
+                          hidden={{ id: String(l.id), projectId }}
+                        />
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+function LedgerFields({ projectId, entry }: { projectId: string; entry?: ProjectLedgerDTO }) {
+  return (
+    <>
+      <input type="hidden" name="projectId" value={projectId} />
+      {entry ? <input type="hidden" name="id" value={entry.id} /> : null}
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Field label="Jenis" htmlFor="l-jenis" required>
+          <SelectInput
+            id="l-jenis"
+            name="jenis"
+            options={JENIS_OPTIONS}
+            defaultValue={entry?.jenis ?? "Debet"}
+          />
+        </Field>
+        <Field label="Tanggal" htmlFor="l-tanggal">
+          <Input
+            id="l-tanggal"
+            name="tanggal"
+            type="date"
+            defaultValue={entry?.tanggal ?? todayStr()}
+          />
+        </Field>
+      </div>
+      <Field label="Nominal (Rp)" htmlFor="l-nominal" required>
+        <Input
+          id="l-nominal"
+          name="nominal"
+          type="number"
+          min={1}
+          step={1}
+          required
+          defaultValue={entry?.nominal ?? ""}
+          placeholder="0"
+        />
+      </Field>
+      <Field label="Keterangan" htmlFor="l-ket">
+        <Input
+          id="l-ket"
+          name="keterangan"
+          defaultValue={entry?.keterangan ?? ""}
+          placeholder="mis. pembelian bahan, termin pembayaran"
+        />
+      </Field>
+    </>
+  );
+}
