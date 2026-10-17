@@ -42,7 +42,7 @@ export function MyProjectsClient({ projects }: { projects: ClientProjectDTO[] })
         <TableRow>
           <TableHead>ID</TableHead>
           <TableHead>Proyek</TableHead>
-          <TableHead>Pihak Ketiga</TableHead>
+          {/* <TableHead>Pihak Ketiga</TableHead> */}
           <TableHead>Periode</TableHead>
           <TableHead>Status</TableHead>
           <TableHead className="text-right">Aksi</TableHead>
@@ -55,7 +55,7 @@ export function MyProjectsClient({ projects }: { projects: ClientProjectDTO[] })
         <TableRow key={p.id}>
           <TableCell className="font-mono text-xs">{p.id}</TableCell>
           <TableCell className="font-medium">{p.nama}</TableCell>
-          <TableCell className="text-muted-foreground">{p.pihakKetigaNama || "-"}</TableCell>
+          {/* <TableCell className="text-muted-foreground">{p.pihakKetigaNama || "-"}</TableCell> */}
           <TableCell className="text-xs text-muted-foreground">
             {displayDate(p.tanggalMulai)} → {p.tanggalSelesaiAktual || p.tanggalSelesaiRencana || "-"}
           </TableCell>
