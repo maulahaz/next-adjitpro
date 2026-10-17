@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Eye, Pencil, Plus, Trash2 } from "lucide-react";
+import { DollarSign, Eye, Pencil, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -26,25 +26,30 @@ import type { ThirdPartyDTO } from "@/lib/services/third-parties";
 export function ProjectsClient({
   projects,
   thirdParties,
+  canWrite,
 }: {
   projects: ProjectEnrichedDTO[];
   thirdParties: ThirdPartyDTO[];
+  /** Hanya admin yang boleh menambah/ubah/hapus proyek di halaman ini. */
+  canWrite: boolean;
 }) {
   return (
     <div className="space-y-4">
-      <div className="flex justify-end">
-        <FormDialog
-          trigger={
-            <Button>
-              <Plus className="h-4 w-4" /> Proyek Baru
-            </Button>
-          }
-          title="Tambah Proyek"
-          action={saveProjectAction}
-        >
-          <ProjectFields thirdParties={thirdParties} />
-        </FormDialog>
-      </div>
+      {canWrite ? (
+        <div className="flex justify-end">
+          <FormDialog
+            trigger={
+              <Button>
+                <Plus className="h-4 w-4" /> Proyek Baru
+              </Button>
+            }
+            title="Tambah Proyek"
+            action={saveProjectAction}
+          >
+            <ProjectFields thirdParties={thirdParties} />
+          </FormDialog>
+        </div>
+      ) : null}
 
       {projects.length === 0 ? (
         <EmptyState message="Belum ada proyek. Buat proyek pertama Anda." />
@@ -89,33 +94,37 @@ export function ProjectsClient({
                   </TableCell>
                   <TableCell>
                     <div className="flex justify-end gap-1">
-                      <Button asChild variant="outline" size="sm">
+                      <Button asChild variant="ghost" size="sm">
                         <Link href={`/projects/${p.id}`}>
-                          <Eye className="h-4 w-4" /> Detail
+                          <DollarSign className="h-4 w-4" /> 
                         </Link>
                       </Button>
-                      <FormDialog
-                        trigger={
-                          <Button variant="ghost" size="icon" aria-label="Ubah">
-                            <Pencil className="h-4 w-4" />
-                          </Button>
-                        }
-                        title="Ubah Proyek"
-                        action={saveProjectAction}
-                      >
-                        <ProjectFields project={p} thirdParties={thirdParties} />
-                      </FormDialog>
-                      <ConfirmDialog
-                        trigger={
-                          <Button variant="ghost" size="icon" aria-label="Hapus" className="text-destructive">
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        }
-                        title="Hapus Proyek"
-                        description={`Hapus proyek ${p.nama}? Penempatan modal dan transaksi terkait juga akan dihapus.`}
-                        action={deleteProjectAction}
-                        hidden={{ id: p.id }}
-                      />
+                      {canWrite ? (
+                        <>
+                          <FormDialog
+                            trigger={
+                              <Button variant="ghost" size="icon" aria-label="Ubah">
+                                <Pencil className="h-4 w-4" />
+                              </Button>
+                            }
+                            title="Ubah Proyek"
+                            action={saveProjectAction}
+                          >
+                            <ProjectFields project={p} thirdParties={thirdParties} />
+                          </FormDialog>
+                          <ConfirmDialog
+                            trigger={
+                              <Button variant="ghost" size="icon" aria-label="Hapus" className="text-destructive">
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            }
+                            title="Hapus Proyek"
+                            description={`Hapus proyek ${p.nama}? Penempatan modal dan transaksi terkait juga akan dihapus.`}
+                            action={deleteProjectAction}
+                            hidden={{ id: p.id }}
+                          />
+                        </>
+                      ) : null}
                     </div>
                   </TableCell>
                 </TableRow>

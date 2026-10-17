@@ -5,9 +5,9 @@
 | | |
 | --- | --- |
 | **Produk** | AdjitPro — Aplikasi Pencatatan Keuangan Investasi |
-| **Versi dokumen** | 1.1 |
+| **Versi dokumen** | 1.3 |
 | **Tanggal** | 17 Oktober 2026 |
-| **Status** | Disetujui — implementasi v1.0 selesai; v1.1 menambah modul **Ledger Proyek** (lihat §7.15) |
+| **Status** | Disetujui — v1.1 menambah **Ledger Proyek** (§7.15); v1.2 memindahkan buat/ubah/hapus **proyek** ke admin+client (§6.1, §7.7); v1.3 menambah kolom **deskripsi** & tampilan tabel ledger (No/Tanggal/Deskripsi/Debet/Kredit/Keterangan) |
 | **Platform** | Web (Next.js 15 App Router), responsif mobile → desktop |
 | **Bahasa** | Antarmuka & pesan kesalahan: Bahasa Indonesia |
 | **Dokumen terkait** | [`README.md`](../README.md) · [`MIGRATION_PLAN.md`](MIGRATION_PLAN.md) · [`INSTALL.md`](INSTALL.md) · [`DATA_MIGRATION.md`](DATA_MIGRATION.md) · [`DEPLOYMENT.md`](DEPLOYMENT.md) |
@@ -157,15 +157,17 @@ Contoh ini menjadi **kasus uji wajib** (lihat §12 dan `tests/domain.test.ts`).
 | Peran | Deskripsi | Hak |
 | --- | --- | --- |
 | `admin` | Pengelola | Semua operasi **+ kelola pengguna** |
-| `operator` | Staf operasional | Semua data (baca & tulis), **tanpa** kelola pengguna |
+| `operator` | Staf operasional | Semua data (baca & tulis) **kecuali buat/ubah/hapus proyek** (read-only), tanpa kelola pengguna |
 | `investor` | Pemodal | **Read-only**, **hanya data miliknya** (Dashboard ter-scope + Kartu Saya) |
-| `client` | Rekanan/pihak ketiga | Hanya proyek milik pihak ketiganya: **baca** status/periode, **tulis** (CRUD) **Ledger Proyek** miliknya. **Tidak** melihat data keuangan internal (modal, pendapatan, biaya, laba, bagi hasil). |
+| `client` | Rekanan/pihak ketiga | Proyek milik pihak ketiganya: **baca** status/periode **dan tulis (buat/ubah/hapus) proyek miliknya** (pihak ketiga otomatis); **tulis (CRUD) Ledger Proyek** miliknya. **Tidak** melihat data keuangan internal (modal, pendapatan, biaya, laba, bagi hasil). |
 
 ### 6.1 Daftar otorisasi (port dari `rolesWrite`/`rolesRead`/`rolesAdmin`)
 
 - `rolesWrite` = `[admin, operator]`
 - `rolesReadInternal` = `[admin, operator, investor]` — **`client` sengaja tidak termasuk**
 - `rolesAdmin` = `[admin]`
+- **Pengecualian (v1.2):** buat/ubah/hapus **proyek** diizinkan untuk `[admin, client]`
+  (bukan `rolesWrite`); client hanya untuk proyek miliknya.
 
 ### 6.2 Matriks menu
 
@@ -173,9 +175,10 @@ Contoh ini menjadi **kasus uji wajib** (lihat §12 dan `tests/domain.test.ts`).
 | --- | :-: | :-: | :-: | :-: |
 | Dashboard | ✔ | ✔ | ✔ *(data sendiri)* | ✖ |
 | Kartu Saya | ✖ | ✖ | ✔ | ✖ |
-| Proyek Saya | ✖ | ✖ | ✖ | ✔ *(proyek sendiri)* |
+| Proyek Saya | ✖ | ✖ | ✖ | ✔ *(buat/ubah/hapus proyek sendiri + Ledger)* |
 | Ledger Proyek | ✔ *(baca, di detail proyek)* | ✔ *(baca, di detail proyek)* | ✖ | ✔ *CRUD, proyek sendiri* |
-| Investor / Proyek / Mutasi Modal / Bagi Hasil / Laporan / Pihak Ketiga | ✔ | ✔ | ✖ | ✖ |
+| Proyek (daftar internal) | ✔ *(buat/ubah/hapus)* | ✔ *(baca)* | ✖ | ✖ |
+| Investor / Mutasi Modal / Bagi Hasil / Laporan / Pihak Ketiga | ✔ | ✔ | ✖ | ✖ |
 | Pengguna | ✔ | ✖ | ✖ | ✖ |
 | Ganti Password | ✔ | ✔ | ✔ | ✔ |
 
@@ -186,10 +189,11 @@ Contoh ini menjadi **kasus uji wajib** (lihat §12 dan `tests/domain.test.ts`).
 | AC-1 | Investor: Dashboard, daftar investor, mutasi modal, bagi hasil, laporan, kartu — **ter-scope** ke `investorId` miliknya. |
 | AC-2 | Investor: **ditolak** mengakses detail proyek. |
 | AC-3 | Client: hanya boleh mengakses daftar proyek milik `thirdPartyId`-nya — **tanpa field keuangan internal** (modal, pendapatan, biaya, laba, bagi hasil). |
-| AC-4 | Client: **ditolak** untuk dashboard, investor, laporan, detail proyek, dan seluruh operasi tulis — **kecuali Ledger Proyek** miliknya (lihat AC-7). |
-| AC-5 | Setiap endpoint tulis menolak peran selain `admin`/`operator`, **kecuali** Ledger Proyek yang justru menolak peran selain `client`. |
+| AC-4 | Client: **ditolak** untuk dashboard, investor, laporan, detail proyek, dan operasi tulis selain **proyek miliknya** dan **Ledger Proyek**-nya (lihat AC-7, AC-8). |
+| AC-5 | Endpoint tulis **proyek** diizinkan untuk `[admin, client]`; endpoint tulis lain menolak peran selain `admin`/`operator`; Ledger Proyek justru menolak peran selain `client`. |
 | AC-6 | Menyembunyikan menu **bukan** kontrol keamanan — validasi selalu diulang di server. |
 | AC-7 | Client: hanya boleh **CRUD Ledger Proyek** untuk proyek yang `pihakKetigaId`-nya sama dengan `thirdPartyId` miliknya; akses ke proyek milik pihak ketiga lain **ditolak di server**. |
+| AC-8 | Client: hanya boleh **buat/ubah/hapus proyek** miliknya. Pembuatan proyek **memaksa** `pihakKetigaId` = `thirdPartyId` client (modal tanpa pilihan pihak ketiga); proyek milik pihak ketiga lain **ditolak di server**. |
 
 ---
 
@@ -271,6 +275,9 @@ Kode persyaratan dipakai sebagai rujukan uji & pelacakan.
 | FR-PRJ-07 | Transaksi proyek **Pendapatan**/**Biaya** dapat ditambah & dihapus. | Wajib |
 | FR-PRJ-08 | Penghapusan proyek ikut menghapus penempatan & transaksinya, tetapi **ditolak** bila sudah dibagikan. | Wajib |
 | FR-PRJ-09 | Proyek `Ditutup` tidak dapat diubah. | Wajib |
+| FR-PRJ-10 | Buat/ubah/hapus proyek diizinkan untuk peran **`admin`** (semua proyek) dan **`client`** (hanya proyek miliknya); **operator & investor read-only**. | Wajib |
+| FR-PRJ-11 | Client membuat proyek dari menu **Proyek Saya**; `pihakKetigaId` **terisi otomatis** dari akun client dan modal **tanpa dropdown Pihak Ketiga**. Ubah/hapus hanya untuk proyek miliknya. | Wajib |
+| FR-PRJ-12 | Di menu **Proyek** (internal), tombol buat/ubah/hapus hanya tampil untuk admin; operator hanya melihat daftar. | Wajib |
 
 ### 7.8 Bagi hasil (`FR-DIST`)
 
@@ -328,6 +335,7 @@ Kode persyaratan dipakai sebagai rujukan uji & pelacakan.
 | FR-MYP-02 | Data yang ditampilkan hanya **nama, periode, dan status** proyek. | Wajib |
 | FR-MYP-03 | **Tidak ada** field keuangan internal (modal/pendapatan/biaya/laba/bagi hasil) yang dikirim ke client. Satu-satunya data keuangan milik client adalah entri **Ledger Proyek** (§7.15). | Wajib |
 | FR-MYP-04 | Setiap proyek pada daftar menyediakan tautan **Buka Ledger** menuju halaman ledger proyek tersebut. | Wajib |
+| FR-MYP-05 | Client dapat **menambah/mengubah/menghapus** proyek miliknya dari halaman ini (pihak ketiga otomatis, tanpa field Pihak Ketiga). | Wajib |
 
 ### 7.14 Audit log (`FR-AUD`)
 
@@ -336,19 +344,19 @@ Kode persyaratan dipakai sebagai rujukan uji & pelacakan.
 | FR-AUD-01 | Setiap operasi tulis mencatat: waktu, pengguna, aksi, entitas, ID record, detail. | Wajib |
 | FR-AUD-02 | Kegagalan pencatatan audit **tidak boleh** menggagalkan transaksi utama. | Wajib |
 
-### 7.15 Ledger Proyek (`FR-LEDGER`) — fitur baru v1.1
+### 7.15 Ledger Proyek (`FR-LEDGER`) — fitur baru v1.1 (kolom **deskripsi** ditambahkan v1.3)
 
 > Modul **baru**: tidak ada di aplikasi lama. Ledger sederhana per proyek
 > (bukan jurnal berpasangan/double-entry). Diakses dari menu **Proyek Saya**.
 
 | ID | Kebutuhan | Prioritas |
 | --- | --- | --- |
-| FR-LEDGER-01 | Kolom entri: **id** (auto increment), **project_id**, **tanggal**, **jenis** (`Debet`/`Kredit`), **nominal** (Rupiah bulat), **keterangan**. | Wajib |
+| FR-LEDGER-01 | Kolom entri: **id** (auto increment), **project_id**, **tanggal**, **deskripsi**, **jenis** (`Debet`/`Kredit`), **nominal** (Rupiah bulat), **keterangan**. | Wajib |
 | FR-LEDGER-02 | Client dapat **menambah / mengubah / menghapus** entri ledger untuk proyek milik pihak ketiganya. | Wajib |
 | FR-LEDGER-03 | Peran **selain client hanya dapat membaca** ledger (read-only), ditampilkan pada halaman detail proyek. | Wajib |
 | FR-LEDGER-04 | Client **ditolak** melakukan CRUD pada proyek milik pihak ketiga lain (ditegakkan di server). | Wajib |
 | FR-LEDGER-05 | Nominal wajib **> 0**; jenis di luar `Debet`/`Kredit` dikembalikan ke nilai aman (`Debet`); tanggal kosong memakai tanggal hari ini. | Wajib |
-| FR-LEDGER-06 | Halaman ledger menampilkan ringkasan **total Debet**, **total Kredit**, dan **selisih**. | Sebaiknya |
+| FR-LEDGER-06 | Halaman ledger menampilkan tabel kolom **No, Tanggal, Deskripsi, Debet, Kredit, Keterangan**, dengan ringkasan **total Debet** & **total Kredit** di baris Total. Nilai `nominal` masuk kolom **Debet** (jenis `Debet`) atau **Kredit** (jenis `Kredit`). | Wajib |
 
 ---
 
@@ -487,7 +495,7 @@ Kode persyaratan dipakai sebagai rujukan uji & pelacakan.
 | `project_funding` | Penempatan modal ke proyek (`Aktif` \| `Dibebaskan`) |
 | `project_transactions` | Pendapatan / biaya proyek |
 | `profit_distributions` | Hasil bagi laba per investor (porsi + jumlah) |
-| `project_ledgers` | **Ledger proyek** (Debet/Kredit, nominal, keterangan) — fitur baru v1.1 |
+| `project_ledgers` | **Ledger proyek** (tanggal, deskripsi, jenis Debet/Kredit, nominal, keterangan) — fitur baru v1.1 |
 | `audit_log` | Jejak audit aktivitas |
 | `sessions` | Sesi login aktif |
 | `login_attempts` | Penghitung percobaan gagal & waktu kunci |
@@ -561,14 +569,15 @@ Rilis dinyatakan memenuhi syarat bila seluruh poin berikut terbukti.
 
 - [ ] Investor hanya menerima data miliknya; akses detail proyek ditolak.
 - [ ] Client hanya menerima nama/periode/status proyeknya (tanpa data keuangan internal) dan entri Ledger Proyek miliknya.
-- [ ] Client hanya dapat menulis pada **Ledger Proyek** miliknya; investor tidak dapat melakukan operasi tulis apa pun (ditolak di server).
+- [ ] Client hanya dapat menulis pada **proyek miliknya** dan **Ledger Proyek** miliknya; investor & operator tidak dapat menambah/mengubah/menghapus proyek (ditolak di server).
+- [ ] Client membuat proyek → tertaut otomatis ke pihak ketiganya (tanpa memilih dropdown).
 - [ ] Ekspor CSV tanpa sesi sah **ditolak (401)**.
 - [ ] Terkunci setelah 5 percobaan gagal; akun nonaktif ditolak.
 - [ ] Login memakai hash lama SHA-256 berhasil dan otomatis di-*upgrade* ke bcrypt.
 
 ### 12.4 Kualitas teknis
 
-- [ ] `npm test` lulus seluruhnya (**35 uji**: 24 domain + 11 integrasi).
+- [ ] `npm test` lulus seluruhnya (**36 uji**: 24 domain + 12 integrasi).
 - [ ] `npm run typecheck` bersih.
 - [ ] `npm run build` sukses.
 - [ ] Migrasi data lama menghasilkan saldo identik & ID tidak berubah.
@@ -635,6 +644,6 @@ digantikan penyedia PostgreSQL/Node lain tanpa mengubah kode aplikasi.
 | **Porsi** | Persentase bagian investor terhadap total modal proyek. |
 | **Ekuitas** | Modal pokok + laba yang telah diterima investor. |
 | **Pihak ketiga** | Rekanan pemilik/pengelola proyek (dapat ditautkan ke peran `client`). |
-| **Ledger Proyek** | Catatan entri Debet/Kredit (dengan nominal & keterangan) per proyek; dikelola oleh peran `client` untuk proyeknya, read-only bagi peran lain. |
+| **Ledger Proyek** | Catatan entri per proyek dengan kolom **No, Tanggal, Deskripsi, Debet, Kredit, Keterangan** (nilai masuk ke Debet/Kredit sesuai jenis) + baris Total; dikelola oleh peran `client` untuk proyeknya, read-only bagi peran lain. |
 | **Largest remainder** | Metode pembulatan yang membagikan sisa rupiah satu per satu ke porsi dengan pecahan terbesar, sehingga total tetap tepat. |
 | **Audit log** | Catatan jejak setiap operasi tulis. |

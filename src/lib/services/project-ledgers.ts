@@ -21,6 +21,7 @@ export interface ProjectLedgerDTO {
   id: number;
   projectId: string;
   tanggal: string;
+  deskripsi: string;
   jenis: string;
   nominal: number;
   keterangan: string;
@@ -30,6 +31,7 @@ export interface LedgerInput {
   id?: number | string;
   projectId?: string;
   tanggal?: string;
+  deskripsi?: string;
   jenis?: string;
   nominal?: number | string;
   keterangan?: string;
@@ -44,6 +46,7 @@ function mapLedger(r: {
   id: number;
   projectId: string;
   tanggal: string | null;
+  deskripsi: string;
   jenis: string;
   nominal: number;
   keterangan: string;
@@ -52,6 +55,7 @@ function mapLedger(r: {
     id: r.id,
     projectId: r.projectId,
     tanggal: toDateString(r.tanggal),
+    deskripsi: r.deskripsi,
     jenis: r.jenis || LEDGER_TIPE.DEBET,
     nominal: Number(r.nominal),
     keterangan: r.keterangan,
@@ -87,6 +91,7 @@ export async function saveProjectLedger(
   const payload = {
     projectId,
     tanggal: toDateString(data.tanggal) || todayStr(),
+    deskripsi: String(data.deskripsi ?? ""),
     jenis,
     nominal,
     keterangan: String(data.keterangan ?? ""),

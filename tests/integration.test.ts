@@ -16,7 +16,7 @@ import { eq } from "drizzle-orm";
 
 import { saveInvestor, listInvestors } from "@/lib/services/investors";
 import { saveThirdParty } from "@/lib/services/third-parties";
-import { saveProject, addFunding, addProjectTransaction, listProjectsEnriched } from "@/lib/services/projects";
+import { saveProject, addFunding, addProjectTransaction, listProjectsEnriched, deleteProject } from "@/lib/services/projects";
 import { addCapitalTransaction, distributeProfit, closeProject } from "@/lib/services/finance";
 import { loadBalances } from "@/lib/services/ledger";
 import { listProjectLedgers, saveProjectLedger, deleteProjectLedger } from "@/lib/services/project-ledgers";
@@ -220,6 +220,47 @@ describe.skipIf(!hasDb)("integrasi: alur keuangan lengkap", () => {
   });
 });
 
+describe.skipIf(!hasDb)("integrasi: proyek — scoping client", () => {
+  beforeAll(async () => {
+    await getSql().unsafe(TRUNCATE);
+    await ensureDefaultAdmin();
+  });
+
+  it("client membuat/mengubah/menghapus hanya proyek pihak ketiganya", async () => {
+    const tp = await saveThirdParty({ nama: "PT Klien" }, "test");
+    const otherTp = await saveThirdParty({ nama: "PT Lain" }, "test");
+
+    // CREATE: pihak ketiga dipaksa dari scope, bukan dari input form.
+    const created = await saveProject({ nama: "Proyek Klien" }, "client1", { scopeThirdPartyId: tp.id });
+    expect(created.pihakKetigaId).toBe(tp.id);
+    expect(created.status).toBe("Draft");
+
+    // UPDATE milik sendiri tetap pada pihak ketiganya.
+    const updated = await saveProject(
+      { id: created.id, nama: "Proyek Klien 2" },
+      "client1",
+      { scopeThirdPartyId: tp.id },
+    );
+    expect(updated.nama).toBe("Proyek Klien 2");
+    expect(updated.pihakKetigaId).toBe(tp.id);
+
+    const other = await saveProject({ nama: "Proyek Lain", pihakKetigaId: otherTp.id }, "test");
+
+    // UPDATE & DELETE proyek pihak ketiga lain DITOLAK.
+    await expect(
+      saveProject({ id: other.id, nama: "diretas" }, "client1", { scopeThirdPartyId: tp.id }),
+    ).rejects.toThrow(/hak akses/);
+    await expect(
+      deleteProject(other.id, "client1", { scopeThirdPartyId: tp.id }),
+    ).rejects.toThrow(/hak akses/);
+
+    // DELETE milik sendiri berhasil.
+    await expect(
+      deleteProject(created.id, "client1", { scopeThirdPartyId: tp.id }),
+    ).resolves.toBe(true);
+  });
+});
+
 describe.skipIf(!hasDb)("integrasi: ledger proyek (client)", () => {
   beforeAll(async () => {
     await getSql().unsafe(TRUNCATE);
@@ -234,26 +275,43 @@ describe.skipIf(!hasDb)("integrasi: ledger proyek (client)", () => {
 
     // CREATE
     const entry = await saveProjectLedger(
-      { projectId: project.id, tanggal: "2026-01-02", jenis: "Debet", nominal: 1500000, keterangan: "modal kerja" },
+      {
+        projectId: project.id,
+        tanggal: "2026-01-02",
+        deskripsi: "Item-1",
+        jenis: "Debet",
+        nominal: 1500000,
+        keterangan: "modal kerja",
+      },
       "client1",
       { thirdPartyId: tp.id },
     );
     expect(entry.jenis).toBe("Debet");
     expect(entry.nominal).toBe(1500000);
+    expect(entry.deskripsi).toBe("Item-1");
     expect(entry.tanggal).toBe("2026-01-02");
 
     let rows = await listProjectLedgers(project.id);
     expect(rows).toHaveLength(1);
+    expect(rows[0]!.deskripsi).toBe("Item-1");
 
-    // UPDATE (jenis & nominal)
+    // UPDATE (jenis, nominal & deskripsi)
     const updated = await saveProjectLedger(
-      { id: entry.id, projectId: project.id, jenis: "Kredit", nominal: 500000, keterangan: "biaya" },
+      {
+        id: entry.id,
+        projectId: project.id,
+        deskripsi: "Item-1 revisi",
+        jenis: "Kredit",
+        nominal: 500000,
+        keterangan: "biaya",
+      },
       "client1",
       { thirdPartyId: tp.id },
     );
     expect(updated.id).toBe(entry.id);
     expect(updated.jenis).toBe("Kredit");
     expect(updated.nominal).toBe(500000);
+    expect(updated.deskripsi).toBe("Item-1 revisi");
 
     // Menulis ke proyek pihak ketiga lain DITOLAK.
     await expect(

@@ -1,7 +1,8 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { requireWrite } from "@/lib/auth/guard";
+import { requireRoles, requireWrite } from "@/lib/auth/guard";
+import { ROLES } from "@/lib/constants";
 import {
   addFunding,
   addProjectTransaction,
@@ -19,13 +20,25 @@ function revalidate(projectId?: string) {
   revalidatePath("/reports");
   revalidatePath("/investors");
   revalidatePath("/capital");
-  if (projectId) revalidatePath(`/projects/${projectId}`);
+  revalidatePath("/my-projects");
+  if (projectId) {
+    revalidatePath(`/projects/${projectId}`);
+    revalidatePath(`/my-projects/${projectId}`);
+  }
 }
 
-/** Simpan proyek — pengganti `apiSaveProject`. */
+/**
+ * Simpan proyek — pengganti `apiSaveProject`.
+ *
+ * Peran yang diizinkan: `admin` dan `client` (operator & investor read-only).
+ * Untuk `client`, pihak ketiga dipaksa ke miliknya sendiri dan hanya proyek
+ * miliknya yang boleh diubah.
+ */
 export async function saveProjectAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
   try {
-    const session = await requireWrite();
+    const session = await requireRoles([ROLES.ADMIN, ROLES.CLIENT]);
+    const scope =
+      session.role === ROLES.CLIENT ? { scopeThirdPartyId: session.thirdPartyId } : undefined;
     const saved = await saveProject(
       {
         id: str(formData, "id") || undefined,
@@ -36,6 +49,7 @@ export async function saveProjectAction(_prev: ActionState, formData: FormData):
         catatan: str(formData, "catatan"),
       },
       session.username,
+      scope,
     );
     revalidate(saved.id);
     return ok("Proyek disimpan.");
@@ -44,12 +58,14 @@ export async function saveProjectAction(_prev: ActionState, formData: FormData):
   }
 }
 
-/** Hapus proyek — pengganti `apiDeleteProject`. */
+/** Hapus proyek (admin atau client — client hanya proyek miliknya). */
 export async function deleteProjectAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
   try {
-    const session = await requireWrite();
+    const session = await requireRoles([ROLES.ADMIN, ROLES.CLIENT]);
     const id = str(formData, "id");
-    await deleteProject(id, session.username);
+    const scope =
+      session.role === ROLES.CLIENT ? { scopeThirdPartyId: session.thirdPartyId } : undefined;
+    await deleteProject(id, session.username, scope);
     revalidate(id);
     return ok("Proyek dihapus.");
   } catch (err) {

@@ -1,0 +1,1 @@
+ALTER TABLE "project_ledgers" ADD COLUMN "deskripsi" text DEFAULT '' NOT NULL;

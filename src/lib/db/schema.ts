@@ -164,6 +164,8 @@ export const projectLedgers = pgTable(
     id: serial("id").primaryKey(),
     projectId: text("project_id").notNull(),
     tanggal: date("tanggal"),
+    /** Uraian entri (kolom DESKRIPSI pada tampilan ledger). */
+    deskripsi: text("deskripsi").notNull().default(""),
     /** 'Debet' | 'Kredit' */
     jenis: text("jenis").notNull().default("Debet"),
     /** Rupiah bulat (bilangan bulat). */

@@ -16,14 +16,14 @@ Drizzle ORM · Tailwind CSS 3 · shadcn/ui · Vitest.
 | **Dashboard** | Total modal, modal terpakai, idle, laba dibagikan, proyek aktif, posisi tiap investor, daftar proyek. Investor hanya melihat data dirinya sendiri. |
 | **Investor** | Master data pemodal + aksi cepat **Setor/Tarik** modal + tombol **Kartu** (statement yang bisa dicetak/PDF). |
 | **Pihak Ketiga** | Master data rekanan proyek. Dipakai untuk menautkan pengguna berperan `client`. |
-| **Proyek** | Master proyek, penempatan modal (funding), transaksi proyek (pendapatan/biaya), **Bagi Hasil**, **Tutup Proyek**. |
+| **Proyek** | Master proyek, penempatan modal (funding), transaksi proyek (pendapatan/biaya), **Bagi Hasil**, **Tutup Proyek**. Buat/ubah/hapus proyek dilakukan **admin** (di sini) dan **client** (di Proyek Saya); operator read-only. |
 | **Mutasi Modal** | Riwayat setoran/penarikan modal, filter per investor, rekap netto. |
 | **Bagi Hasil** | Riwayat pembagian laba per proyek per investor beserta porsi (%). |
 | **Laporan** | Rekap investor, rekap proyek, riwayat bagi hasil, **export CSV**, dan **cetak**. |
 | **Pengguna** | Kelola akun (khusus admin): peran, tautan ke investor/pihak ketiga, reset password, aktif/nonaktif. |
 | **Kartu Saya** | Halaman investor: statement dirinya sendiri. |
-| **Proyek Saya** | Halaman client: daftar proyek milik pihak ketiganya, dengan tautan **Buka Ledger** per proyek. |
-| **Ledger Proyek** | Ledger **Debet/Kredit** per proyek (fitur baru, bukan dari aplikasi lama). **Hanya peran `client`** yang dapat menambah/ubah/menghapus entri — dan hanya untuk proyek milik pihak ketiganya. Peran lain hanya **membaca** (read-only) di detail proyek. |
+| **Proyek Saya** | Halaman client: daftar proyek milik pihak ketiganya. Client dapat **menambah/mengubah/menghapus proyeknya** di sini (pihak ketiga terisi otomatis) dan membuka **Buka Ledger** per proyek. |
+| **Ledger Proyek** | Ledger **Debet/Kredit** per proyek (fitur baru, bukan dari aplikasi lama). Ditampilkan sebagai tabel **No · Tanggal · Deskripsi · Debet · Kredit · Keterangan** (nilai masuk ke kolom Debet/Kredit sesuai jenis) dengan baris **Total**. **Hanya peran `client`** yang dapat menambah/ubah/menghapus entri — dan hanya untuk proyek milik pihak ketiganya. Peran lain hanya **membaca** (read-only) di detail proyek. |
 | **Ganti Password** | Setiap pengguna dapat mengganti password sendiri (wajib tahu password lama). |
 
 ### Aturan bisnis inti (sama persis dengan aplikasi lama)
@@ -47,15 +47,17 @@ Drizzle ORM · Tailwind CSS 3 · shadcn/ui · Vitest.
 | --- | :-: | :-: | :-: | :-: |
 | Dashboard | ✔ | ✔ | ✔ (data sendiri) | ✖ |
 | Kartu Saya | ✖ | ✖ | ✔ | ✖ |
-| Proyek Saya | ✖ | ✖ | ✖ | ✔ (proyek sendiri) |
+| Proyek (daftar internal) | ✔ (buat/ubah/hapus) | ✔ (baca) | ✖ | ✖ |
+| Proyek Saya | ✖ | ✖ | ✖ | ✔ (buat/ubah/hapus proyek sendiri) |
 | Ledger Proyek | ✔ (baca, di detail proyek) | ✔ (baca, di detail proyek) | ✖ | ✔ (CRUD, proyek sendiri) |
-| Investor / Proyek / Mutasi Modal / Bagi Hasil / Laporan / Pihak Ketiga | ✔ | ✔ | ✖ | ✖ |
+| Investor / Mutasi Modal / Bagi Hasil / Laporan / Pihak Ketiga | ✔ | ✔ | ✖ | ✖ |
 | Pengguna | ✔ | ✖ | ✖ | ✖ |
 | Ganti Password | ✔ | ✔ | ✔ | ✔ |
 
 Semua pemeriksaan hak akses dilakukan **di server** (bukan hanya menyembunyikan menu).
-**Pengecualian satu-satunya** untuk operasi tulis oleh client adalah modul **Ledger
-Proyek** — ditegakkan di server dan dibatasi hanya untuk proyek milik pihak ketiganya.
+Peran `client` **hanya** dapat menulis pada **proyek miliknya** (di Proyek Saya) dan
+**Ledger Proyek** miliknya — keduanya ditegakkan di server dan dibatasi ke pihak
+ketiganya. Halaman internal **Proyek** bersifat read-only untuk operator.
 
 ---
 
@@ -149,6 +151,10 @@ Perbedaan teknis yang disengaja:
 - **Ledger Proyek** adalah modul **baru** (tidak ada di aplikasi lama) sehingga
   memakai primary key `serial` (auto increment) alih-alih format ID teks lama;
   akses tulisnya khusus peran `client` untuk proyek miliknya.
+- **Sebagian kepemilikan proyek diserahkan ke client**: peran `client` dapat
+  membuat/mengubah/menghapus proyek **miliknya** (pihak ketiga terisi otomatis)
+  lewat menu **Proyek Saya**; admin tetap mengelola semua proyek di menu **Proyek**,
+  sedangkan operator hanya membaca.
 - Sesi disimpan di tabel + cookie `httpOnly` `adjitpro_session` (bukan `CacheService`),
   agar konsisten di lingkungan serverless dan bisa dicabut saat logout.
 - Password lama (`sha256(salt + "::" + password)`) **tetap bisa login** dan otomatis
@@ -161,7 +167,7 @@ Perbedaan teknis yang disengaja:
 ## 6. Pengujian
 
 ```powershell
-npm test          # 35 uji: 24 logika murni + 11 integrasi PostgreSQL
+npm test          # 36 uji: 24 logika murni + 12 integrasi PostgreSQL
 ```
 
 Uji integrasi otomatis dilewati bila `DATABASE_URL` tidak tersedia, sehingga

@@ -169,14 +169,30 @@ export interface ProjectInput {
   catatan?: string;
 }
 
-export async function saveProject(data: ProjectInput, actor: string): Promise<ProjectDTO> {
+/**
+ * Batasan akses proyek. Bila `scopeThirdPartyId` diisi (peran client), pembuatan
+ * memaksa pihak ketiga milik client tersebut, dan ubah/hapus hanya boleh untuk
+ * proyek miliknya.
+ */
+export interface ProjectScope {
+  scopeThirdPartyId?: string;
+}
+
+export async function saveProject(
+  data: ProjectInput,
+  actor: string,
+  scope?: ProjectScope,
+): Promise<ProjectDTO> {
   if (!data || !data.nama || String(data.nama).trim() === "") {
     throw new AppError("Nama proyek wajib diisi.");
   }
 
+  const scopeTp = scope?.scopeThirdPartyId;
+  const pihakKetigaId = scopeTp ?? (data.pihakKetigaId || null);
+
   const payload = {
     nama: String(data.nama).trim(),
-    pihakKetigaId: data.pihakKetigaId || null,
+    pihakKetigaId,
     tanggalMulai: toDateString(data.tanggalMulai) || todayStr(),
     tanggalSelesaiRencana: toDateString(data.tanggalSelesaiRencana) || null,
     catatan: data.catatan ?? "",
@@ -184,6 +200,9 @@ export async function saveProject(data: ProjectInput, actor: string): Promise<Pr
 
   if (data.id) {
     const existing = await getProjectRow(data.id);
+    if (scopeTp && (!existing || existing.pihakKetigaId !== scopeTp)) {
+      throw new AppError("Anda tidak memiliki hak akses untuk proyek ini.");
+    }
     if (existing && existing.status === STATUS.PROYEK_DITUTUP) {
       throw new AppError("Proyek sudah ditutup dan tidak bisa diubah.");
     }
@@ -207,7 +226,19 @@ export async function saveProject(data: ProjectInput, actor: string): Promise<Pr
   return mapProject({ ...row, createdAt: new Date() } as never, tp);
 }
 
-export async function deleteProject(id: string, actor: string): Promise<boolean> {
+export async function deleteProject(
+  id: string,
+  actor: string,
+  scope?: ProjectScope,
+): Promise<boolean> {
+  if (scope?.scopeThirdPartyId) {
+    const existing = await getProjectRow(id);
+    if (!existing) throw new AppError("Proyek tidak ditemukan.");
+    if (existing.pihakKetigaId !== scope.scopeThirdPartyId) {
+      throw new AppError("Anda tidak memiliki hak akses untuk proyek ini.");
+    }
+  }
+
   const totals = await computeTotalsFor(id);
   if (totals.sudahDibagikan) {
     throw new AppError("Proyek sudah dibagikan hasilnya dan tidak bisa dihapus.");

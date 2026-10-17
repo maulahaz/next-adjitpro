@@ -7,7 +7,7 @@ import { ProjectsClient } from "@/components/app/projects-client";
 export const dynamic = "force-dynamic";
 
 export default async function ProjectsPage() {
-  await requireRolesPage(["admin", "operator"]);
+  const user = await requireRolesPage(["admin", "operator"]);
   const [projects, thirdParties] = await Promise.all([listProjectsEnriched(), listThirdParties()]);
 
   return (
@@ -16,7 +16,11 @@ export default async function ProjectsPage() {
         title="Proyek"
         description="Kelola proyek, tempatkan modal investor, catat pendapatan/biaya, lalu bagi hasil."
       />
-      <ProjectsClient projects={projects} thirdParties={thirdParties} />
+      <ProjectsClient
+        projects={projects}
+        thirdParties={thirdParties}
+        canWrite={user.role === "admin"}
+      />
     </div>
   );
 }

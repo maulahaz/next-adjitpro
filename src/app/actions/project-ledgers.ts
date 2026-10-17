@@ -29,6 +29,7 @@ export async function saveLedgerAction(_prev: ActionState, formData: FormData): 
         id: str(formData, "id") || undefined,
         projectId: str(formData, "projectId"),
         tanggal: str(formData, "tanggal"),
+        deskripsi: str(formData, "deskripsi"),
         jenis: str(formData, "jenis"),
         nominal: num(formData, "nominal"),
         keterangan: str(formData, "keterangan"),

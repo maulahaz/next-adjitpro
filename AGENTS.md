@@ -73,12 +73,15 @@ Gotchas:
   (`Aktif` → `Dibebaskan`). Withdrawals/placements cannot exceed the investor's idle balance.
 - Legacy passwords (`sha256(salt + "::" + password)`) must keep verifying and auto-upgrade to bcrypt
   on successful login — preserve `legacyHashPassword` / `verifyPassword` semantics.
-- Role scoping is server-side: `investor` sees only their own data; `client` sees only their third
-  party's projects, and `rolesReadInternal` deliberately excludes `client`. The **one write
-  exception** is ProjectLedger (`src/lib/services/project-ledgers.ts` + `src/app/actions/project-ledgers.ts`):
-  `client` may CRUD ledger entries, but only for projects of its own `thirdPartyId` (verified again in
-  the service); every other role is read-only and sees it on the project detail page. Ledger IDs use
-  `serial` (auto-increment), not the legacy text format — it is a new module, not from the old app.
+- Role scoping is server-side: `investor` sees only their own data; `client` sees only its third
+  party's projects, and `rolesReadInternal` deliberately excludes `client`. There are two write
+  exceptions, both re-verified in the service against the client's `thirdPartyId`:
+  1. **Project CRUD** — `saveProject` / `deleteProject` take an optional `ProjectScope`; the actions
+     allow `[admin, client]`, and a client's create forces `pihakKetigaId` to its own third party.
+     Operator is read-only on `/projects`; client manages projects from `/my-projects`.
+  2. **ProjectLedger** (`src/lib/services/project-ledgers.ts` + `src/app/actions/project-ledgers.ts`) —
+     client-only write, read-only elsewhere (shown on the project detail page). Ledger IDs use
+     `serial` (auto-increment), not the legacy text format — it is a new module, not from the old app.
 
 ## Data & sensitive files
 

@@ -12,6 +12,7 @@ import {
   Table,
   TableBody,
   TableCell,
+  TableFooter,
   TableHead,
   TableHeader,
   TableRow,
@@ -24,6 +25,7 @@ import {
 } from "@/app/actions/projects";
 import { closeProjectAction, distributeProfitAction } from "@/app/actions/finance";
 import { formatRupiah } from "@/lib/domain/money";
+import { computeLedgerTotals } from "@/lib/domain/ledger-totals";
 import { displayDate, todayStr } from "@/lib/domain/dates";
 import type { ProjectDetailDTO } from "@/lib/services/projects";
 
@@ -34,6 +36,8 @@ const TIPE_OPTIONS = [
 
 export function ProjectDetailClient({ detail }: { detail: ProjectDetailDTO }) {
   const { project, totals, fundings, transactions, distributions, ledgers, availableInvestors } = detail;
+
+  const ledgerTotals = computeLedgerTotals(ledgers);
 
   const locked = project.status === "Ditutup";
   const sudahDibagikan = totals.sudahDibagikan;
@@ -316,30 +320,53 @@ export function ProjectDetailClient({ detail }: { detail: ProjectDetailDTO }) {
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead className="w-12 text-center">No</TableHead>
                   <TableHead>Tanggal</TableHead>
-                  <TableHead>Jenis</TableHead>
+                  <TableHead>Deskripsi</TableHead>
+                  <TableHead className="text-right">Debet</TableHead>
+                  <TableHead className="text-right">Kredit</TableHead>
                   <TableHead>Keterangan</TableHead>
-                  <TableHead className="text-right">Nominal</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {ledgers.map((l) => (
-                  <TableRow key={l.id}>
-                    <TableCell>{displayDate(l.tanggal)}</TableCell>
-                    <TableCell>
-                      <StatusPill status={l.jenis} />
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">{l.keterangan || "-"}</TableCell>
-                    <TableCell
-                      className={`text-right tabular-nums ${
-                        l.jenis === "Kredit" ? "text-destructive" : "text-success"
-                      }`}
-                    >
-                      {formatRupiah(l.nominal)}
-                    </TableCell>
-                  </TableRow>
-                ))}
+                {ledgers.map((l, i) => {
+                  const isKredit = l.jenis === "Kredit";
+                  return (
+                    <TableRow key={l.id}>
+                      <TableCell className="text-center tabular-nums text-muted-foreground">
+                        {i + 1}
+                      </TableCell>
+                      <TableCell className="whitespace-nowrap">{displayDate(l.tanggal)}</TableCell>
+                      <TableCell className="min-w-[12rem] whitespace-normal">
+                        {l.deskripsi || "-"}
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums text-success">
+                        {isKredit ? "" : formatRupiah(l.nominal)}
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums text-destructive">
+                        {isKredit ? formatRupiah(l.nominal) : ""}
+                      </TableCell>
+                      <TableCell className="max-w-[16rem] whitespace-normal text-muted-foreground">
+                        {l.keterangan || "-"}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
               </TableBody>
+              <TableFooter>
+                <TableRow>
+                  <TableCell colSpan={3} className="text-right">
+                    Total
+                  </TableCell>
+                  <TableCell className="text-right tabular-nums">
+                    {formatRupiah(ledgerTotals.debet)}
+                  </TableCell>
+                  <TableCell className="text-right tabular-nums">
+                    {formatRupiah(ledgerTotals.kredit)}
+                  </TableCell>
+                  <TableCell />
+                </TableRow>
+              </TableFooter>
             </Table>
           )}
         </CardContent>

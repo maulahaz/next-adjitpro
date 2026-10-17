@@ -6,11 +6,12 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Field, SelectInput } from "@/components/app/field";
 import { FormDialog, ConfirmDialog } from "@/components/app/form-dialog";
-import { EmptyState, StatCard, StatusPill } from "@/components/app/ui-helpers";
+import { EmptyState, StatCard } from "@/components/app/ui-helpers";
 import {
   Table,
   TableBody,
   TableCell,
+  TableFooter,
   TableHead,
   TableHeader,
   TableRow,
@@ -75,62 +76,81 @@ export function ProjectLedgerClient({
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead className="w-12 text-center">No</TableHead>
                   <TableHead>Tanggal</TableHead>
-                  <TableHead>Jenis</TableHead>
+                  <TableHead>Deskripsi</TableHead>
+                  <TableHead className="text-right">Debet</TableHead>
+                  <TableHead className="text-right">Kredit</TableHead>
                   <TableHead>Keterangan</TableHead>
-                  <TableHead className="text-right">Nominal</TableHead>
                   <TableHead className="text-right">Aksi</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {ledgers.map((l) => (
-                  <TableRow key={l.id}>
-                    <TableCell>{displayDate(l.tanggal)}</TableCell>
-                    <TableCell>
-                      <StatusPill status={l.jenis} />
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">{l.keterangan || "-"}</TableCell>
-                    <TableCell
-                      className={`text-right tabular-nums ${
-                        l.jenis === "Kredit" ? "text-destructive" : "text-success"
-                      }`}
-                    >
-                      {formatRupiah(l.nominal)}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex justify-end gap-1">
-                        <FormDialog
-                          trigger={
-                            <Button variant="ghost" size="icon" aria-label="Ubah">
-                              <Pencil className="h-4 w-4" />
-                            </Button>
-                          }
-                          title="Ubah Entri Ledger"
-                          action={saveLedgerAction}
-                        >
-                          <LedgerFields projectId={projectId} entry={l} />
-                        </FormDialog>
-                        <ConfirmDialog
-                          trigger={
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              aria-label="Hapus"
-                              className="text-destructive"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          }
-                          title="Hapus Entri Ledger"
-                          description={`Hapus entri ${l.jenis} ${formatRupiah(l.nominal)}?`}
-                          action={deleteLedgerAction}
-                          hidden={{ id: String(l.id), projectId }}
-                        />
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
+                {ledgers.map((l, i) => {
+                  const isKredit = l.jenis === "Kredit";
+                  return (
+                    <TableRow key={l.id}>
+                      <TableCell className="text-center tabular-nums text-muted-foreground">
+                        {i + 1}
+                      </TableCell>
+                      <TableCell className="whitespace-nowrap">{displayDate(l.tanggal)}</TableCell>
+                      <TableCell className="min-w-[12rem] whitespace-normal">
+                        {l.deskripsi || "-"}
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums text-success">
+                        {isKredit ? "" : formatRupiah(l.nominal)}
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums text-destructive">
+                        {isKredit ? formatRupiah(l.nominal) : ""}
+                      </TableCell>
+                      <TableCell className="max-w-[16rem] whitespace-normal text-muted-foreground">
+                        {l.keterangan || "-"}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex justify-end gap-1">
+                          <FormDialog
+                            trigger={
+                              <Button variant="ghost" size="icon" aria-label="Ubah">
+                                <Pencil className="h-4 w-4" />
+                              </Button>
+                            }
+                            title="Ubah Entri Ledger"
+                            action={saveLedgerAction}
+                          >
+                            <LedgerFields projectId={projectId} entry={l} />
+                          </FormDialog>
+                          <ConfirmDialog
+                            trigger={
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                aria-label="Hapus"
+                                className="text-destructive"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            }
+                            title="Hapus Entri Ledger"
+                            description={`Hapus entri ${l.jenis} ${formatRupiah(l.nominal)}?`}
+                            action={deleteLedgerAction}
+                            hidden={{ id: String(l.id), projectId }}
+                          />
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
               </TableBody>
+              <TableFooter>
+                <TableRow>
+                  <TableCell colSpan={3} className="text-right">
+                    Total
+                  </TableCell>
+                  <TableCell className="text-right tabular-nums">{formatRupiah(totals.debet)}</TableCell>
+                  <TableCell className="text-right tabular-nums">{formatRupiah(totals.kredit)}</TableCell>
+                  <TableCell colSpan={2} />
+                </TableRow>
+              </TableFooter>
             </Table>
           )}
         </CardContent>
@@ -144,21 +164,29 @@ function LedgerFields({ projectId, entry }: { projectId: string; entry?: Project
     <>
       <input type="hidden" name="projectId" value={projectId} />
       {entry ? <input type="hidden" name="id" value={entry.id} /> : null}
+      <Field label="Deskripsi" htmlFor="l-deskripsi">
+        <Input
+          id="l-deskripsi"
+          name="deskripsi"
+          defaultValue={entry?.deskripsi ?? ""}
+          placeholder="mis. Item-1, pembelian bahan"
+        />
+      </Field>
       <div className="grid gap-4 sm:grid-cols-2">
-        <Field label="Jenis" htmlFor="l-jenis" required>
-          <SelectInput
-            id="l-jenis"
-            name="jenis"
-            options={JENIS_OPTIONS}
-            defaultValue={entry?.jenis ?? "Debet"}
-          />
-        </Field>
         <Field label="Tanggal" htmlFor="l-tanggal">
           <Input
             id="l-tanggal"
             name="tanggal"
             type="date"
             defaultValue={entry?.tanggal ?? todayStr()}
+          />
+        </Field>
+        <Field label="Jenis" htmlFor="l-jenis" required>
+          <SelectInput
+            id="l-jenis"
+            name="jenis"
+            options={JENIS_OPTIONS}
+            defaultValue={entry?.jenis ?? "Debet"}
           />
         </Field>
       </div>
@@ -179,7 +207,7 @@ function LedgerFields({ projectId, entry }: { projectId: string; entry?: Project
           id="l-ket"
           name="keterangan"
           defaultValue={entry?.keterangan ?? ""}
-          placeholder="mis. pembelian bahan, termin pembayaran"
+          placeholder="mis. termin pembayaran, catatan tambahan"
         />
       </Field>
     </>
