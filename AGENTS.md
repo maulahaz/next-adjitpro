@@ -60,6 +60,10 @@ Gotchas:
   `requireRolesPage`) and per action (`requireWrite` / `requireRoles`). `src/app/(app)/layout.tsx`
   sets `dynamic = "force-dynamic"`.
 - `src/lib/db/schema.ts` — single source of truth for the schema; migrations are generated into `drizzle/`.
+- `src/components/app/data-table.tsx` — the **standard table** (search + pagination, 10 rows/page)
+  used by every data list. Build rows as `<TableRow>` JSX and pass `head`/`rows`/`searchText`; pass
+  `bordered={false}` when the table already sits inside a `Card`. Keep new tables on this component
+  rather than hand-rolling `Table` markup.
 
 ## Invariants (do not break)
 

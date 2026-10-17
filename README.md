@@ -155,6 +155,10 @@ Perbedaan teknis yang disengaja:
   membuat/mengubah/menghapus proyek **miliknya** (pihak ketiga terisi otomatis)
   lewat menu **Proyek Saya**; admin tetap mengelola semua proyek di menu **Proyek**,
   sedangkan operator hanya membaca.
+- **Standar tampilan tabel** (`src/components/app/data-table.tsx`, `DataTable`) dipakai
+  oleh **semua** daftar data: paginasi maksimum **10 baris/halaman** + kotak **pencarian**
+  yang muncul otomatis bila data lebih dari satu halaman, dengan toolbar aksi/filter dan
+  baris Total (bila ada). Lihat PRD §7.16.
 - Sesi disimpan di tabel + cookie `httpOnly` `adjitpro_session` (bukan `CacheService`),
   agar konsisten di lingkungan serverless dan bisa dicabut saat logout.
 - Password lama (`sha256(salt + "::" + password)`) **tetap bisa login** dan otomatis

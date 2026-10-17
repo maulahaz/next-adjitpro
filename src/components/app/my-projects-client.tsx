@@ -5,11 +5,11 @@ import { BookOpen, Pencil, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Field } from "@/components/app/field";
 import { FormDialog, ConfirmDialog } from "@/components/app/form-dialog";
-import { StatusPill, EmptyState } from "@/components/app/ui-helpers";
+import { DataTable } from "@/components/app/data-table";
+import { StatusPill } from "@/components/app/ui-helpers";
+import { TableCell, TableHead, TableRow } from "@/components/ui/table";
 import { saveProjectAction, deleteProjectAction } from "@/app/actions/projects";
 import { displayDate, todayStr } from "@/lib/domain/dates";
 import type { ClientProjectDTO } from "@/lib/services/reports";
@@ -21,8 +21,8 @@ import type { ClientProjectDTO } from "@/lib/services/reports";
  */
 export function MyProjectsClient({ projects }: { projects: ClientProjectDTO[] }) {
   return (
-    <div className="space-y-4">
-      <div className="flex justify-end">
+    <DataTable
+      toolbar={
         <FormDialog
           trigger={
             <Button>
@@ -35,67 +35,67 @@ export function MyProjectsClient({ projects }: { projects: ClientProjectDTO[] })
         >
           <ClientProjectFields />
         </FormDialog>
-      </div>
-
-      {projects.length === 0 ? (
-        <EmptyState message="Belum ada proyek yang terkait dengan akun Anda." />
-      ) : (
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-          {projects.map((p) => (
-            <Card key={p.id}>
-              <CardContent className="space-y-2 p-4 sm:p-4">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="font-semibold">{p.nama}</div>
-                  <StatusPill status={p.status} />
-                </div>
-                <div className="text-xs text-muted-foreground">
-                  {p.pihakKetigaNama ? <Badge variant="secondary">{p.pihakKetigaNama}</Badge> : null}
-                </div>
-                <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-sm">
-                  <dt className="text-muted-foreground">Mulai</dt>
-                  <dd>{displayDate(p.tanggalMulai)}</dd>
-                  <dt className="text-muted-foreground">Rencana Selesai</dt>
-                  <dd>{displayDate(p.tanggalSelesaiRencana)}</dd>
-                  <dt className="text-muted-foreground">Selesai Aktual</dt>
-                  <dd>{displayDate(p.tanggalSelesaiAktual)}</dd>
-                </dl>
-                {p.catatan ? <p className="text-sm text-muted-foreground">{p.catatan}</p> : null}
-
-                <div className="flex items-center gap-2 pt-1">
-                  <Button asChild variant="outline" size="sm" className="flex-1">
-                    <Link href={`/my-projects/${p.id}`}>
-                      <BookOpen className="h-4 w-4" /> Buka Ledger
-                    </Link>
-                  </Button>
-                  <FormDialog
-                    trigger={
-                      <Button variant="ghost" size="icon" aria-label="Ubah">
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                    }
-                    title="Ubah Proyek"
-                    action={saveProjectAction}
-                  >
-                    <ClientProjectFields project={p} />
-                  </FormDialog>
-                  <ConfirmDialog
-                    trigger={
-                      <Button variant="ghost" size="icon" aria-label="Hapus" className="text-destructive">
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    }
-                    title="Hapus Proyek"
-                    description={`Hapus proyek ${p.nama}? Penempatan modal dan transaksi terkait juga akan dihapus.`}
-                    action={deleteProjectAction}
-                    hidden={{ id: p.id }}
-                  />
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+      }
+      searchPlaceholder="Cari proyek…"
+      emptyMessage="Belum ada proyek yang terkait dengan akun Anda."
+      head={
+        <TableRow>
+          <TableHead>ID</TableHead>
+          <TableHead>Proyek</TableHead>
+          <TableHead>Pihak Ketiga</TableHead>
+          <TableHead>Periode</TableHead>
+          <TableHead>Status</TableHead>
+          <TableHead className="text-right">Aksi</TableHead>
+        </TableRow>
+      }
+      searchText={projects.map(
+        (p) => `${p.nama} ${p.id} ${p.pihakKetigaNama ?? ""} ${p.status} ${p.catatan ?? ""}`,
       )}
-    </div>
+      rows={projects.map((p) => (
+        <TableRow key={p.id}>
+          <TableCell className="font-mono text-xs">{p.id}</TableCell>
+          <TableCell className="font-medium">{p.nama}</TableCell>
+          <TableCell className="text-muted-foreground">{p.pihakKetigaNama || "-"}</TableCell>
+          <TableCell className="text-xs text-muted-foreground">
+            {displayDate(p.tanggalMulai)} → {p.tanggalSelesaiAktual || p.tanggalSelesaiRencana || "-"}
+          </TableCell>
+          <TableCell>
+            <StatusPill status={p.status} />
+          </TableCell>
+          <TableCell>
+            <div className="flex justify-end gap-1">
+              <Button asChild variant="outline" size="sm">
+                <Link href={`/my-projects/${p.id}`}>
+                  <BookOpen className="h-4 w-4" /> Ledger
+                </Link>
+              </Button>
+              <FormDialog
+                trigger={
+                  <Button variant="ghost" size="icon" aria-label="Ubah">
+                    <Pencil className="h-4 w-4" />
+                  </Button>
+                }
+                title="Ubah Proyek"
+                action={saveProjectAction}
+              >
+                <ClientProjectFields project={p} />
+              </FormDialog>
+              <ConfirmDialog
+                trigger={
+                  <Button variant="ghost" size="icon" aria-label="Hapus" className="text-destructive">
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                }
+                title="Hapus Proyek"
+                description={`Hapus proyek ${p.nama}? Penempatan modal dan transaksi terkait juga akan dihapus.`}
+                action={deleteProjectAction}
+                hidden={{ id: p.id }}
+              />
+            </div>
+          </TableCell>
+        </TableRow>
+      ))}
+    />
   );
 }
 

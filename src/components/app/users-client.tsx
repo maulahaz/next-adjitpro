@@ -7,16 +7,10 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Field, SelectInput } from "@/components/app/field";
 import { FormDialog, ConfirmDialog } from "@/components/app/form-dialog";
-import { StatusPill, EmptyState } from "@/components/app/ui-helpers";
+import { DataTable } from "@/components/app/data-table";
+import { StatusPill } from "@/components/app/ui-helpers";
 import { Badge } from "@/components/ui/badge";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { TableCell, TableHead, TableRow } from "@/components/ui/table";
 import { deleteUserAction, resetUserPasswordAction, saveUserAction } from "@/app/actions/users";
 import { ROLE_LABEL } from "@/lib/domain/permissions";
 import type { UserDTO } from "@/lib/services/users";
@@ -50,8 +44,8 @@ export function UsersClient({
   const tpName = (id: string) => thirdParties.find((t) => t.id === id)?.nama ?? "";
 
   return (
-    <div className="space-y-4">
-      <div className="flex justify-end">
+    <DataTable
+      toolbar={
         <FormDialog
           trigger={
             <Button>
@@ -63,93 +57,93 @@ export function UsersClient({
         >
           <UserFields investors={investors} thirdParties={thirdParties} />
         </FormDialog>
-      </div>
-
-      {users.length === 0 ? (
-        <EmptyState message="Belum ada pengguna." />
-      ) : (
-        <div className="rounded-lg border bg-card">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Username</TableHead>
-                <TableHead>Nama</TableHead>
-                <TableHead>Peran</TableHead>
-                <TableHead>Tautan</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Login Terakhir</TableHead>
-                <TableHead className="text-right">Aksi</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {users.map((u) => (
-                <TableRow key={u.id}>
-                  <TableCell className="font-mono text-xs">{u.username}</TableCell>
-                  <TableCell className="font-medium">{u.nama}</TableCell>
-                  <TableCell>
-                    <Badge variant="secondary">{ROLE_LABEL[u.role] ?? u.role}</Badge>
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {u.role === "investor" ? investorName(u.investorId) || "-" : null}
-                    {u.role === "client" ? tpName(u.thirdPartyId) || "-" : null}
-                    {u.role !== "investor" && u.role !== "client" ? "-" : null}
-                  </TableCell>
-                  <TableCell>
-                    <StatusPill status={u.status} />
-                  </TableCell>
-                  <TableCell className="text-xs text-muted-foreground">{u.lastLogin || "-"}</TableCell>
-                  <TableCell>
-                    <div className="flex justify-end gap-1">
-                      <FormDialog
-                        trigger={
-                          <Button variant="ghost" size="icon" aria-label="Ubah">
-                            <Pencil className="h-4 w-4" />
-                          </Button>
-                        }
-                        title="Ubah Pengguna"
-                        action={saveUserAction}
-                      >
-                        <UserFields user={u} investors={investors} thirdParties={thirdParties} />
-                      </FormDialog>
-                      <FormDialog
-                        trigger={
-                          <Button variant="ghost" size="icon" aria-label="Reset password">
-                            <KeyRound className="h-4 w-4" />
-                          </Button>
-                        }
-                        title={`Reset Password — ${u.username}`}
-                        action={resetUserPasswordAction}
-                        submitLabel="Reset Password"
-                      >
-                        <input type="hidden" name="id" value={u.id} />
-                        <Field label="Password Baru" htmlFor={`rp-${u.id}`} required hint="Minimal 6 karakter.">
-                          <Input id={`rp-${u.id}`} name="newPassword" type="password" minLength={6} required />
-                        </Field>
-                      </FormDialog>
-                      {u.id !== currentUserId ? (
-                        <ConfirmDialog
-                          trigger={
-                            <Button variant="ghost" size="icon" aria-label="Hapus" className="text-destructive">
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          }
-                          title="Hapus Pengguna"
-                          description={`Hapus pengguna ${u.username}?`}
-                          action={deleteUserAction}
-                          hidden={{ id: u.id }}
-                        />
-                      ) : (
-                        <span className="grid h-9 w-9 place-items-center text-xs text-muted-foreground">•</span>
-                      )}
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
+      }
+      searchPlaceholder="Cari pengguna…"
+      emptyMessage="Belum ada pengguna."
+      head={
+        <TableRow>
+          <TableHead>Username</TableHead>
+          <TableHead>Nama</TableHead>
+          <TableHead>Peran</TableHead>
+          <TableHead>Tautan</TableHead>
+          <TableHead>Status</TableHead>
+          <TableHead>Login Terakhir</TableHead>
+          <TableHead className="text-right">Aksi</TableHead>
+        </TableRow>
+      }
+      searchText={users.map((u) =>
+        [
+          u.username,
+          u.nama,
+          ROLE_LABEL[u.role] ?? u.role,
+          u.role === "investor" ? investorName(u.investorId) : u.role === "client" ? tpName(u.thirdPartyId) : "",
+          u.status,
+        ].join(" "),
       )}
-    </div>
+      rows={users.map((u) => (
+        <TableRow key={u.id}>
+          <TableCell className="font-mono text-xs">{u.username}</TableCell>
+          <TableCell className="font-medium">{u.nama}</TableCell>
+          <TableCell>
+            <Badge variant="secondary">{ROLE_LABEL[u.role] ?? u.role}</Badge>
+          </TableCell>
+          <TableCell className="text-muted-foreground">
+            {u.role === "investor" ? investorName(u.investorId) || "-" : null}
+            {u.role === "client" ? tpName(u.thirdPartyId) || "-" : null}
+            {u.role !== "investor" && u.role !== "client" ? "-" : null}
+          </TableCell>
+          <TableCell>
+            <StatusPill status={u.status} />
+          </TableCell>
+          <TableCell className="text-xs text-muted-foreground">{u.lastLogin || "-"}</TableCell>
+          <TableCell>
+            <div className="flex justify-end gap-1">
+              <FormDialog
+                trigger={
+                  <Button variant="ghost" size="icon" aria-label="Ubah">
+                    <Pencil className="h-4 w-4" />
+                  </Button>
+                }
+                title="Ubah Pengguna"
+                action={saveUserAction}
+              >
+                <UserFields user={u} investors={investors} thirdParties={thirdParties} />
+              </FormDialog>
+              <FormDialog
+                trigger={
+                  <Button variant="ghost" size="icon" aria-label="Reset password">
+                    <KeyRound className="h-4 w-4" />
+                  </Button>
+                }
+                title={`Reset Password — ${u.username}`}
+                action={resetUserPasswordAction}
+                submitLabel="Reset Password"
+              >
+                <input type="hidden" name="id" value={u.id} />
+                <Field label="Password Baru" htmlFor={`rp-${u.id}`} required hint="Minimal 6 karakter.">
+                  <Input id={`rp-${u.id}`} name="newPassword" type="password" minLength={6} required />
+                </Field>
+              </FormDialog>
+              {u.id !== currentUserId ? (
+                <ConfirmDialog
+                  trigger={
+                    <Button variant="ghost" size="icon" aria-label="Hapus" className="text-destructive">
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  }
+                  title="Hapus Pengguna"
+                  description={`Hapus pengguna ${u.username}?`}
+                  action={deleteUserAction}
+                  hidden={{ id: u.id }}
+                />
+              ) : (
+                <span className="grid h-9 w-9 place-items-center text-xs text-muted-foreground">•</span>
+              )}
+            </div>
+          </TableCell>
+        </TableRow>
+      ))}
+    />
   );
 }
 

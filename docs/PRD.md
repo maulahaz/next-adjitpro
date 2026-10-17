@@ -5,9 +5,9 @@
 | | |
 | --- | --- |
 | **Produk** | AdjitPro — Aplikasi Pencatatan Keuangan Investasi |
-| **Versi dokumen** | 1.3 |
+| **Versi dokumen** | 1.4 |
 | **Tanggal** | 17 Oktober 2026 |
-| **Status** | Disetujui — v1.1 menambah **Ledger Proyek** (§7.15); v1.2 memindahkan buat/ubah/hapus **proyek** ke admin+client (§6.1, §7.7); v1.3 menambah kolom **deskripsi** & tampilan tabel ledger (No/Tanggal/Deskripsi/Debet/Kredit/Keterangan) |
+| **Status** | Disetujui — v1.1 menambah **Ledger Proyek** (§7.15); v1.2 memindahkan buat/ubah/hapus **proyek** ke admin+client (§6.1, §7.7); v1.3 menambah kolom **deskripsi** & tampilan tabel ledger; v1.4 menetapkan **standar tabel** (pencarian + paginasi 10 baris) untuk semua daftar (§7.16) |
 | **Platform** | Web (Next.js 15 App Router), responsif mobile → desktop |
 | **Bahasa** | Antarmuka & pesan kesalahan: Bahasa Indonesia |
 | **Dokumen terkait** | [`README.md`](../README.md) · [`MIGRATION_PLAN.md`](MIGRATION_PLAN.md) · [`INSTALL.md`](INSTALL.md) · [`DATA_MIGRATION.md`](DATA_MIGRATION.md) · [`DEPLOYMENT.md`](DEPLOYMENT.md) |
@@ -358,6 +358,22 @@ Kode persyaratan dipakai sebagai rujukan uji & pelacakan.
 | FR-LEDGER-05 | Nominal wajib **> 0**; jenis di luar `Debet`/`Kredit` dikembalikan ke nilai aman (`Debet`); tanggal kosong memakai tanggal hari ini. | Wajib |
 | FR-LEDGER-06 | Halaman ledger menampilkan tabel kolom **No, Tanggal, Deskripsi, Debet, Kredit, Keterangan**, dengan ringkasan **total Debet** & **total Kredit** di baris Total. Nilai `nominal` masuk kolom **Debet** (jenis `Debet`) atau **Kredit** (jenis `Kredit`). | Wajib |
 
+### 7.16 Standar tampilan tabel (`FR-UI-TABLE`) — standar v1.4
+
+> **Standar tunggal** untuk **semua** daftar data di aplikasi (proyek, investor, pihak
+> ketiga, mutasi modal, bagi hasil, laporan, pengguna, ledger, dst.). Semua tabel
+> memakai komponen yang sama (`src/components/app/data-table.tsx`) agar tampilan,
+> pencarian, dan paginasi konsisten.
+
+| ID | Kebutuhan | Prioritas |
+| --- | --- | --- |
+| FR-UI-TABLE-01 | Daftar data ditampilkan sebagai **tabel** (bukan kartu), dengan header kolom yang konsisten. | Wajib |
+| FR-UI-TABLE-02 | **Paginasi** dengan maksimum **10 baris per halaman**; navigasi Sebelumnya/Berikutnya + info "Menampilkan a–b dari n". | Wajib |
+| FR-UI-TABLE-03 | **Pencarian** teks (case-insensitive) yang muncul otomatis bila data **lebih dari satu halaman** (> 10 baris); kata kunci kosong menampilkan semua. | Wajib |
+| FR-UI-TABLE-04 | Tombol aksi (Tambah/Ubah/Hapus) dan filter (mis. per investor) ditempatkan pada **toolbar** tabel yang sama. | Wajib |
+| FR-UI-TABLE-05 | Baris **Total/Net** (bila ada) tetap ditampilkan sebagai footer tabel dan dihitung dari seluruh data. | Sebaiknya |
+| FR-UI-TABLE-06 | Saat pencarian tidak menemukan hasil, tampilkan pesan kosong yang jelas; saat data kosong, tampilkan pesan kosong bawaan halaman. | Wajib |
+
 ---
 
 ## 8. Aturan validasi & pesan kesalahan
@@ -574,6 +590,7 @@ Rilis dinyatakan memenuhi syarat bila seluruh poin berikut terbukti.
 - [ ] Ekspor CSV tanpa sesi sah **ditolak (401)**.
 - [ ] Terkunci setelah 5 percobaan gagal; akun nonaktif ditolak.
 - [ ] Login memakai hash lama SHA-256 berhasil dan otomatis di-*upgrade* ke bcrypt.
+- [ ] Semua daftar data memakai **standar tabel** (§7.16): maksimum **10 baris/halaman**, paginasi, dan pencarian yang muncul bila data > 10 baris.
 
 ### 12.4 Kualitas teknis
 

@@ -7,16 +7,10 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Field, SelectInput } from "@/components/app/field";
 import { FormDialog, ConfirmDialog } from "@/components/app/form-dialog";
-import { StatusPill, EmptyState } from "@/components/app/ui-helpers";
+import { DataTable } from "@/components/app/data-table";
+import { StatusPill } from "@/components/app/ui-helpers";
 import { Badge } from "@/components/ui/badge";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { TableCell, TableHead, TableRow } from "@/components/ui/table";
 import { saveProjectAction, deleteProjectAction } from "@/app/actions/projects";
 import { formatRupiah } from "@/lib/domain/money";
 import { displayDate, todayStr } from "@/lib/domain/dates";
@@ -34,9 +28,9 @@ export function ProjectsClient({
   canWrite: boolean;
 }) {
   return (
-    <div className="space-y-4">
-      {canWrite ? (
-        <div className="flex justify-end">
+    <DataTable
+      toolbar={
+        canWrite ? (
           <FormDialog
             trigger={
               <Button>
@@ -48,92 +42,84 @@ export function ProjectsClient({
           >
             <ProjectFields thirdParties={thirdParties} />
           </FormDialog>
-        </div>
-      ) : null}
-
-      {projects.length === 0 ? (
-        <EmptyState message="Belum ada proyek. Buat proyek pertama Anda." />
-      ) : (
-        <div className="rounded-lg border bg-card">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Proyek</TableHead>
-                <TableHead>Pihak Ketiga</TableHead>
-                <TableHead>Periode</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="text-right">Modal</TableHead>
-                <TableHead className="text-right">Laba</TableHead>
-                <TableHead className="text-right">Aksi</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {projects.map((p) => (
-                <TableRow key={p.id}>
-                  <TableCell>
-                    <div className="font-medium">{p.nama}</div>
-                    <div className="font-mono text-xs text-muted-foreground">{p.id}</div>
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">{p.pihakKetigaNama || "-"}</TableCell>
-                  <TableCell className="text-xs text-muted-foreground">
-                    {displayDate(p.tanggalMulai)} → {p.tanggalSelesaiAktual || p.tanggalSelesaiRencana || "-"}
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      <StatusPill status={p.status} />
-                      {p.sudahDibagikan ? (
-                        <Badge variant="secondary" className="text-[10px]">
-                          dibagikan
-                        </Badge>
-                      ) : null}
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-right tabular-nums">{formatRupiah(p.modal)}</TableCell>
-                  <TableCell className={`text-right tabular-nums ${p.laba < 0 ? "text-destructive" : ""}`}>
-                    {formatRupiah(p.laba)}
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex justify-end gap-1">
-                      <Button asChild variant="ghost" size="sm">
-                        <Link href={`/projects/${p.id}`}>
-                          <DollarSign className="h-4 w-4" /> 
-                        </Link>
+        ) : null
+      }
+      searchPlaceholder="Cari proyek…"
+      emptyMessage="Belum ada proyek. Buat proyek pertama Anda."
+      head={
+        <TableRow>
+          <TableHead>Proyek</TableHead>
+          <TableHead>Pihak Ketiga</TableHead>
+          <TableHead>Periode</TableHead>
+          <TableHead>Status</TableHead>
+          <TableHead className="text-right">Modal</TableHead>
+          <TableHead className="text-right">Laba</TableHead>
+          <TableHead className="text-right">Aksi</TableHead>
+        </TableRow>
+      }
+      searchText={projects.map((p) => `${p.nama} ${p.id} ${p.pihakKetigaNama ?? ""} ${p.status}`)}
+      rows={projects.map((p) => (
+        <TableRow key={p.id}>
+          <TableCell>
+            <div className="font-medium">{p.nama}</div>
+            <div className="font-mono text-xs text-muted-foreground">{p.id}</div>
+          </TableCell>
+          <TableCell className="text-muted-foreground">{p.pihakKetigaNama || "-"}</TableCell>
+          <TableCell className="text-xs text-muted-foreground">
+            {displayDate(p.tanggalMulai)} → {p.tanggalSelesaiAktual || p.tanggalSelesaiRencana || "-"}
+          </TableCell>
+          <TableCell>
+            <div className="flex items-center gap-2">
+              <StatusPill status={p.status} />
+              {p.sudahDibagikan ? (
+                <Badge variant="secondary" className="text-[10px]">
+                  dibagikan
+                </Badge>
+              ) : null}
+            </div>
+          </TableCell>
+          <TableCell className="text-right tabular-nums">{formatRupiah(p.modal)}</TableCell>
+          <TableCell className={`text-right tabular-nums ${p.laba < 0 ? "text-destructive" : ""}`}>
+            {formatRupiah(p.laba)}
+          </TableCell>
+          <TableCell>
+            <div className="flex justify-end gap-1">
+              <Button asChild variant="ghost" size="sm">
+                <Link href={`/projects/${p.id}`}>
+                  <DollarSign className="h-4 w-4" />{" "}
+                </Link>
+              </Button>
+              {canWrite ? (
+                <>
+                  <FormDialog
+                    trigger={
+                      <Button variant="ghost" size="icon" aria-label="Ubah">
+                        <Pencil className="h-4 w-4" />
                       </Button>
-                      {canWrite ? (
-                        <>
-                          <FormDialog
-                            trigger={
-                              <Button variant="ghost" size="icon" aria-label="Ubah">
-                                <Pencil className="h-4 w-4" />
-                              </Button>
-                            }
-                            title="Ubah Proyek"
-                            action={saveProjectAction}
-                          >
-                            <ProjectFields project={p} thirdParties={thirdParties} />
-                          </FormDialog>
-                          <ConfirmDialog
-                            trigger={
-                              <Button variant="ghost" size="icon" aria-label="Hapus" className="text-destructive">
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            }
-                            title="Hapus Proyek"
-                            description={`Hapus proyek ${p.nama}? Penempatan modal dan transaksi terkait juga akan dihapus.`}
-                            action={deleteProjectAction}
-                            hidden={{ id: p.id }}
-                          />
-                        </>
-                      ) : null}
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
-      )}
-    </div>
+                    }
+                    title="Ubah Proyek"
+                    action={saveProjectAction}
+                  >
+                    <ProjectFields project={p} thirdParties={thirdParties} />
+                  </FormDialog>
+                  <ConfirmDialog
+                    trigger={
+                      <Button variant="ghost" size="icon" aria-label="Hapus" className="text-destructive">
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    }
+                    title="Hapus Proyek"
+                    description={`Hapus proyek ${p.nama}? Penempatan modal dan transaksi terkait juga akan dihapus.`}
+                    action={deleteProjectAction}
+                    hidden={{ id: p.id }}
+                  />
+                </>
+              ) : null}
+            </div>
+          </TableCell>
+        </TableRow>
+      ))}
+    />
   );
 }
 

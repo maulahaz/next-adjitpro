@@ -7,16 +7,9 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Field, SelectInput } from "@/components/app/field";
 import { FormDialog, ConfirmDialog } from "@/components/app/form-dialog";
-import { StatusPill, EmptyState, StatCard } from "@/components/app/ui-helpers";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableFooter,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { DataTable } from "@/components/app/data-table";
+import { StatusPill, StatCard } from "@/components/app/ui-helpers";
+import { TableCell, TableHead, TableRow } from "@/components/ui/table";
 import {
   addFundingAction,
   addProjectTransactionAction,
@@ -41,6 +34,7 @@ export function ProjectDetailClient({ detail }: { detail: ProjectDetailDTO }) {
 
   const locked = project.status === "Ditutup";
   const sudahDibagikan = totals.sudahDibagikan;
+  const canEdit = !locked && !sudahDibagikan;
 
   return (
     <div className="space-y-6">
@@ -132,177 +126,175 @@ export function ProjectDetailClient({ detail }: { detail: ProjectDetailDTO }) {
 
       {/* Penempatan Modal */}
       <Card>
-        <CardHeader className="flex-row items-center justify-between space-y-0">
+        <CardHeader>
           <CardTitle>Penempatan Modal ({fundings.length})</CardTitle>
-          {!locked && !sudahDibagikan ? (
-            <FormDialog
-              trigger={
-                <Button size="sm">
-                  <Plus className="h-4 w-4" /> Tempatkan Modal
-                </Button>
-              }
-              title="Tempatkan Modal Investor"
-              description="Penempatan tidak boleh melebihi saldo idle investor."
-              action={addFundingAction}
-            >
-              <input type="hidden" name="projectId" value={project.id} />
-              <Field label="Investor" htmlFor="f-investor" required>
-                <SelectInput
-                  id="f-investor"
-                  name="investorId"
-                  required
-                  placeholder="— pilih investor —"
-                  options={availableInvestors.map((i) => ({
-                    value: i.id,
-                    label: `${i.nama} (idle: ${formatRupiah(i.idle)})`,
-                  }))}
-                />
-              </Field>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <Field label="Tanggal" htmlFor="f-tanggal">
-                  <Input id="f-tanggal" name="tanggal" type="date" defaultValue={todayStr()} />
-                </Field>
-                <Field label="Jumlah (Rp)" htmlFor="f-jumlah" required>
-                  <Input id="f-jumlah" name="jumlah" type="number" min={1} step={1} required placeholder="0" />
-                </Field>
-              </div>
-            </FormDialog>
-          ) : null}
         </CardHeader>
         <CardContent className="p-0 sm:p-0">
-          {fundings.length === 0 ? (
-            <div className="p-4">
-              <EmptyState message="Belum ada penempatan modal pada proyek ini." />
-            </div>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Investor</TableHead>
-                  <TableHead>Tanggal</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Jumlah</TableHead>
-                  {!locked && !sudahDibagikan ? <TableHead className="text-right">Aksi</TableHead> : null}
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {fundings.map((f) => (
-                  <TableRow key={f.id}>
-                    <TableCell className="font-medium">{f.investorNama}</TableCell>
-                    <TableCell>{displayDate(f.tanggal)}</TableCell>
-                    <TableCell>
-                      <StatusPill status={f.status} />
-                    </TableCell>
-                    <TableCell className="text-right tabular-nums">{formatRupiah(f.jumlah)}</TableCell>
-                    {!locked && !sudahDibagikan ? (
-                      <TableCell>
-                        <div className="flex justify-end">
-                          <ConfirmDialog
-                            trigger={
-                              <Button variant="ghost" size="icon" aria-label="Batalkan" className="text-destructive">
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            }
-                            title="Batalkan Penempatan"
-                            description={`Batalkan penempatan ${formatRupiah(f.jumlah)} dari ${f.investorNama}?`}
-                            action={removeFundingAction}
-                            hidden={{ id: f.id, projectId: project.id }}
-                            confirmLabel="Batalkan"
-                          />
-                        </div>
-                      </TableCell>
-                    ) : null}
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
+          <DataTable
+            bordered={false}
+            toolbar={
+              canEdit ? (
+                <FormDialog
+                  trigger={
+                    <Button size="sm">
+                      <Plus className="h-4 w-4" /> Tempatkan Modal
+                    </Button>
+                  }
+                  title="Tempatkan Modal Investor"
+                  description="Penempatan tidak boleh melebihi saldo idle investor."
+                  action={addFundingAction}
+                >
+                  <input type="hidden" name="projectId" value={project.id} />
+                  <Field label="Investor" htmlFor="f-investor" required>
+                    <SelectInput
+                      id="f-investor"
+                      name="investorId"
+                      required
+                      placeholder="— pilih investor —"
+                      options={availableInvestors.map((i) => ({
+                        value: i.id,
+                        label: `${i.nama} (idle: ${formatRupiah(i.idle)})`,
+                      }))}
+                    />
+                  </Field>
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <Field label="Tanggal" htmlFor="f-tanggal">
+                      <Input id="f-tanggal" name="tanggal" type="date" defaultValue={todayStr()} />
+                    </Field>
+                    <Field label="Jumlah (Rp)" htmlFor="f-jumlah" required>
+                      <Input id="f-jumlah" name="jumlah" type="number" min={1} step={1} required placeholder="0" />
+                    </Field>
+                  </div>
+                </FormDialog>
+              ) : null
+            }
+            searchPlaceholder="Cari penempatan…"
+            emptyMessage="Belum ada penempatan modal pada proyek ini."
+            head={
+              <TableRow>
+                <TableHead>Investor</TableHead>
+                <TableHead>Tanggal</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead className="text-right">Jumlah</TableHead>
+                {canEdit ? <TableHead className="text-right">Aksi</TableHead> : null}
+              </TableRow>
+            }
+            searchText={fundings.map((f) => `${f.investorNama} ${f.status} ${displayDate(f.tanggal)}`)}
+            rows={fundings.map((f) => (
+              <TableRow key={f.id}>
+                <TableCell className="font-medium">{f.investorNama}</TableCell>
+                <TableCell>{displayDate(f.tanggal)}</TableCell>
+                <TableCell>
+                  <StatusPill status={f.status} />
+                </TableCell>
+                <TableCell className="text-right tabular-nums">{formatRupiah(f.jumlah)}</TableCell>
+                {canEdit ? (
+                  <TableCell>
+                    <div className="flex justify-end">
+                      <ConfirmDialog
+                        trigger={
+                          <Button variant="ghost" size="icon" aria-label="Batalkan" className="text-destructive">
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        }
+                        title="Batalkan Penempatan"
+                        description={`Batalkan penempatan ${formatRupiah(f.jumlah)} dari ${f.investorNama}?`}
+                        action={removeFundingAction}
+                        hidden={{ id: f.id, projectId: project.id }}
+                        confirmLabel="Batalkan"
+                      />
+                    </div>
+                  </TableCell>
+                ) : null}
+              </TableRow>
+            ))}
+          />
         </CardContent>
       </Card>
 
       {/* Transaksi Proyek */}
       <Card>
-        <CardHeader className="flex-row items-center justify-between space-y-0">
+        <CardHeader>
           <CardTitle>Pendapatan &amp; Biaya ({transactions.length})</CardTitle>
-          {!locked && !sudahDibagikan ? (
-            <FormDialog
-              trigger={
-                <Button size="sm">
-                  <Plus className="h-4 w-4" /> Tambah Transaksi
-                </Button>
-              }
-              title="Tambah Transaksi Proyek"
-              action={addProjectTransactionAction}
-            >
-              <input type="hidden" name="projectId" value={project.id} />
-              <div className="grid gap-4 sm:grid-cols-2">
-                <Field label="Tipe" htmlFor="t-tipe" required>
-                  <SelectInput id="t-tipe" name="tipe" options={TIPE_OPTIONS} defaultValue="Pendapatan" />
-                </Field>
-                <Field label="Tanggal" htmlFor="t-tanggal">
-                  <Input id="t-tanggal" name="tanggal" type="date" defaultValue={todayStr()} />
-                </Field>
-              </div>
-              <Field label="Jumlah (Rp)" htmlFor="t-jumlah" required>
-                <Input id="t-jumlah" name="jumlah" type="number" min={1} step={1} required placeholder="0" />
-              </Field>
-              <Field label="Keterangan" htmlFor="t-ket">
-                <Input id="t-ket" name="keterangan" placeholder="mis. penjualan unit, biaya operasional" />
-              </Field>
-            </FormDialog>
-          ) : null}
         </CardHeader>
         <CardContent className="p-0 sm:p-0">
-          {transactions.length === 0 ? (
-            <div className="p-4">
-              <EmptyState message="Belum ada transaksi." />
-            </div>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Tanggal</TableHead>
-                  <TableHead>Tipe</TableHead>
-                  <TableHead>Keterangan</TableHead>
-                  <TableHead className="text-right">Jumlah</TableHead>
-                  {!locked && !sudahDibagikan ? <TableHead className="text-right">Aksi</TableHead> : null}
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {transactions.map((t) => (
-                  <TableRow key={t.id}>
-                    <TableCell>{displayDate(t.tanggal)}</TableCell>
-                    <TableCell>
-                      <StatusPill status={t.tipe} />
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">{t.keterangan || "-"}</TableCell>
-                    <TableCell
-                      className={`text-right tabular-nums ${t.tipe === "Biaya" ? "text-destructive" : "text-success"}`}
-                    >
-                      {formatRupiah(t.jumlah)}
-                    </TableCell>
-                    {!locked && !sudahDibagikan ? (
-                      <TableCell>
-                        <div className="flex justify-end">
-                          <ConfirmDialog
-                            trigger={
-                              <Button variant="ghost" size="icon" aria-label="Hapus" className="text-destructive">
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            }
-                            title="Hapus Transaksi"
-                            description={`Hapus transaksi ${t.tipe} ${formatRupiah(t.jumlah)}?`}
-                            action={deleteProjectTransactionAction}
-                            hidden={{ id: t.id, projectId: project.id }}
-                          />
-                        </div>
-                      </TableCell>
-                    ) : null}
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
+          <DataTable
+            bordered={false}
+            toolbar={
+              canEdit ? (
+                <FormDialog
+                  trigger={
+                    <Button size="sm">
+                      <Plus className="h-4 w-4" /> Tambah Transaksi
+                    </Button>
+                  }
+                  title="Tambah Transaksi Proyek"
+                  action={addProjectTransactionAction}
+                >
+                  <input type="hidden" name="projectId" value={project.id} />
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <Field label="Tipe" htmlFor="t-tipe" required>
+                      <SelectInput id="t-tipe" name="tipe" options={TIPE_OPTIONS} defaultValue="Pendapatan" />
+                    </Field>
+                    <Field label="Tanggal" htmlFor="t-tanggal">
+                      <Input id="t-tanggal" name="tanggal" type="date" defaultValue={todayStr()} />
+                    </Field>
+                  </div>
+                  <Field label="Jumlah (Rp)" htmlFor="t-jumlah" required>
+                    <Input id="t-jumlah" name="jumlah" type="number" min={1} step={1} required placeholder="0" />
+                  </Field>
+                  <Field label="Keterangan" htmlFor="t-ket">
+                    <Input id="t-ket" name="keterangan" placeholder="mis. penjualan unit, biaya operasional" />
+                  </Field>
+                </FormDialog>
+              ) : null
+            }
+            searchPlaceholder="Cari transaksi…"
+            emptyMessage="Belum ada transaksi."
+            head={
+              <TableRow>
+                <TableHead>Tanggal</TableHead>
+                <TableHead>Tipe</TableHead>
+                <TableHead>Keterangan</TableHead>
+                <TableHead className="text-right">Jumlah</TableHead>
+                {canEdit ? <TableHead className="text-right">Aksi</TableHead> : null}
+              </TableRow>
+            }
+            searchText={transactions.map(
+              (t) => `${t.tipe} ${t.keterangan ?? ""} ${displayDate(t.tanggal)}`,
+            )}
+            rows={transactions.map((t) => (
+              <TableRow key={t.id}>
+                <TableCell>{displayDate(t.tanggal)}</TableCell>
+                <TableCell>
+                  <StatusPill status={t.tipe} />
+                </TableCell>
+                <TableCell className="text-muted-foreground">{t.keterangan || "-"}</TableCell>
+                <TableCell
+                  className={`text-right tabular-nums ${t.tipe === "Biaya" ? "text-destructive" : "text-success"}`}
+                >
+                  {formatRupiah(t.jumlah)}
+                </TableCell>
+                {canEdit ? (
+                  <TableCell>
+                    <div className="flex justify-end">
+                      <ConfirmDialog
+                        trigger={
+                          <Button variant="ghost" size="icon" aria-label="Hapus" className="text-destructive">
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        }
+                        title="Hapus Transaksi"
+                        description={`Hapus transaksi ${t.tipe} ${formatRupiah(t.jumlah)}?`}
+                        action={deleteProjectTransactionAction}
+                        hidden={{ id: t.id, projectId: project.id }}
+                      />
+                    </div>
+                  </TableCell>
+                ) : null}
+              </TableRow>
+            ))}
+          />
         </CardContent>
       </Card>
 
@@ -312,63 +304,55 @@ export function ProjectDetailClient({ detail }: { detail: ProjectDetailDTO }) {
           <CardTitle>Ledger Proyek ({ledgers.length})</CardTitle>
         </CardHeader>
         <CardContent className="p-0 sm:p-0">
-          {ledgers.length === 0 ? (
-            <div className="p-4">
-              <EmptyState message="Belum ada entri ledger. Entri diisi oleh peran client dari menu Proyek Saya." />
-            </div>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-12 text-center">No</TableHead>
-                  <TableHead>Tanggal</TableHead>
-                  <TableHead>Deskripsi</TableHead>
-                  <TableHead className="text-right">Debet</TableHead>
-                  <TableHead className="text-right">Kredit</TableHead>
-                  <TableHead>Keterangan</TableHead>
+          <DataTable
+            bordered={false}
+            searchPlaceholder="Cari entri ledger…"
+            emptyMessage="Belum ada entri ledger. Entri diisi oleh peran client dari menu Proyek Saya."
+            head={
+              <TableRow>
+                <TableHead className="w-12 text-center">No</TableHead>
+                <TableHead>Tanggal</TableHead>
+                <TableHead>Deskripsi</TableHead>
+                <TableHead className="text-right">Debet</TableHead>
+                <TableHead className="text-right">Kredit</TableHead>
+                <TableHead>Keterangan</TableHead>
+              </TableRow>
+            }
+            searchText={ledgers.map(
+              (l) => `${l.deskripsi ?? ""} ${l.keterangan ?? ""} ${l.jenis} ${displayDate(l.tanggal)}`,
+            )}
+            rows={ledgers.map((l, i) => {
+              const isKredit = l.jenis === "Kredit";
+              return (
+                <TableRow key={l.id}>
+                  <TableCell className="text-center tabular-nums text-muted-foreground">
+                    {i + 1}
+                  </TableCell>
+                  <TableCell className="whitespace-nowrap">{displayDate(l.tanggal)}</TableCell>
+                  <TableCell className="min-w-[12rem] whitespace-normal">{l.deskripsi || "-"}</TableCell>
+                  <TableCell className="text-right tabular-nums text-success">
+                    {isKredit ? "" : formatRupiah(l.nominal)}
+                  </TableCell>
+                  <TableCell className="text-right tabular-nums text-destructive">
+                    {isKredit ? formatRupiah(l.nominal) : ""}
+                  </TableCell>
+                  <TableCell className="max-w-[16rem] whitespace-normal text-muted-foreground">
+                    {l.keterangan || "-"}
+                  </TableCell>
                 </TableRow>
-              </TableHeader>
-              <TableBody>
-                {ledgers.map((l, i) => {
-                  const isKredit = l.jenis === "Kredit";
-                  return (
-                    <TableRow key={l.id}>
-                      <TableCell className="text-center tabular-nums text-muted-foreground">
-                        {i + 1}
-                      </TableCell>
-                      <TableCell className="whitespace-nowrap">{displayDate(l.tanggal)}</TableCell>
-                      <TableCell className="min-w-[12rem] whitespace-normal">
-                        {l.deskripsi || "-"}
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums text-success">
-                        {isKredit ? "" : formatRupiah(l.nominal)}
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums text-destructive">
-                        {isKredit ? formatRupiah(l.nominal) : ""}
-                      </TableCell>
-                      <TableCell className="max-w-[16rem] whitespace-normal text-muted-foreground">
-                        {l.keterangan || "-"}
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-              <TableFooter>
-                <TableRow>
-                  <TableCell colSpan={3} className="text-right">
-                    Total
-                  </TableCell>
-                  <TableCell className="text-right tabular-nums">
-                    {formatRupiah(ledgerTotals.debet)}
-                  </TableCell>
-                  <TableCell className="text-right tabular-nums">
-                    {formatRupiah(ledgerTotals.kredit)}
-                  </TableCell>
-                  <TableCell />
-                </TableRow>
-              </TableFooter>
-            </Table>
-          )}
+              );
+            })}
+            footer={
+              <TableRow>
+                <TableCell colSpan={3} className="text-right">
+                  Total
+                </TableCell>
+                <TableCell className="text-right tabular-nums">{formatRupiah(ledgerTotals.debet)}</TableCell>
+                <TableCell className="text-right tabular-nums">{formatRupiah(ledgerTotals.kredit)}</TableCell>
+                <TableCell />
+              </TableRow>
+            }
+          />
         </CardContent>
       </Card>
 
@@ -379,30 +363,32 @@ export function ProjectDetailClient({ detail }: { detail: ProjectDetailDTO }) {
             <CardTitle>Bagi Hasil</CardTitle>
           </CardHeader>
           <CardContent className="p-0 sm:p-0">
-            <Table>
-              <TableHeader>
+            <DataTable
+              bordered={false}
+              searchPlaceholder="Cari bagi hasil…"
+              emptyMessage="Belum ada bagi hasil."
+              head={
                 <TableRow>
                   <TableHead>Investor</TableHead>
                   <TableHead>Tanggal</TableHead>
                   <TableHead className="text-right">Porsi (%)</TableHead>
                   <TableHead className="text-right">Laba</TableHead>
                 </TableRow>
-              </TableHeader>
-              <TableBody>
-                {distributions.map((d) => (
-                  <TableRow key={d.id}>
-                    <TableCell className="font-medium">{d.investorNama}</TableCell>
-                    <TableCell>{displayDate(d.tanggal)}</TableCell>
-                    <TableCell className="text-right tabular-nums">{d.porsi}</TableCell>
-                    <TableCell
-                      className={`text-right tabular-nums ${d.jumlahLaba < 0 ? "text-destructive" : "text-success"}`}
-                    >
-                      {formatRupiah(d.jumlahLaba)}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+              }
+              searchText={distributions.map((d) => `${d.investorNama} ${displayDate(d.tanggal)}`)}
+              rows={distributions.map((d) => (
+                <TableRow key={d.id}>
+                  <TableCell className="font-medium">{d.investorNama}</TableCell>
+                  <TableCell>{displayDate(d.tanggal)}</TableCell>
+                  <TableCell className="text-right tabular-nums">{d.porsi}</TableCell>
+                  <TableCell
+                    className={`text-right tabular-nums ${d.jumlahLaba < 0 ? "text-destructive" : "text-success"}`}
+                  >
+                    {formatRupiah(d.jumlahLaba)}
+                  </TableCell>
+                </TableRow>
+              ))}
+            />
           </CardContent>
         </Card>
       ) : null}

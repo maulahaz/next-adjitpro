@@ -1,17 +1,10 @@
 import { formatRupiah } from "@/lib/domain/money";
 import { displayDate } from "@/lib/domain/dates";
 import { PrintButton } from "@/components/app/print-button";
-import { StatusPill, EmptyState } from "@/components/app/ui-helpers";
+import { DataTable } from "@/components/app/data-table";
+import { StatusPill } from "@/components/app/ui-helpers";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableFooter,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { TableCell, TableHead, TableRow } from "@/components/ui/table";
 import type { InvestorStatementDTO } from "@/lib/services/reports";
 
 export function StatementCard({
@@ -62,40 +55,38 @@ export function StatementCard({
           <CardTitle>Mutasi Modal</CardTitle>
         </CardHeader>
         <CardContent className="p-0 sm:p-0">
-          {capitalTransactions.length === 0 ? (
-            <div className="p-4">
-              <EmptyState message="Belum ada mutasi modal." />
-            </div>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Tanggal</TableHead>
-                  <TableHead>Tipe</TableHead>
-                  <TableHead className="text-right">Jumlah</TableHead>
-                  <TableHead>Catatan</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {capitalTransactions.map((c) => (
-                  <TableRow key={c.id}>
-                    <TableCell>{displayDate(c.tanggal)}</TableCell>
-                    <TableCell>
-                      <StatusPill status={c.tipe} />
-                    </TableCell>
-                    <TableCell
-                      className={`text-right tabular-nums ${
-                        c.tipe === "Tarik" ? "text-destructive" : "text-success"
-                      }`}
-                    >
-                      {formatRupiah(c.jumlah)}
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">{c.catatan || "-"}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
+          <DataTable
+            bordered={false}
+            searchPlaceholder="Cari mutasi…"
+            emptyMessage="Belum ada mutasi modal."
+            head={
+              <TableRow>
+                <TableHead>Tanggal</TableHead>
+                <TableHead>Tipe</TableHead>
+                <TableHead className="text-right">Jumlah</TableHead>
+                <TableHead>Catatan</TableHead>
+              </TableRow>
+            }
+            searchText={capitalTransactions.map(
+              (c) => `${c.tipe} ${c.catatan ?? ""} ${displayDate(c.tanggal)}`,
+            )}
+            rows={capitalTransactions.map((c) => (
+              <TableRow key={c.id}>
+                <TableCell>{displayDate(c.tanggal)}</TableCell>
+                <TableCell>
+                  <StatusPill status={c.tipe} />
+                </TableCell>
+                <TableCell
+                  className={`text-right tabular-nums ${
+                    c.tipe === "Tarik" ? "text-destructive" : "text-success"
+                  }`}
+                >
+                  {formatRupiah(c.jumlah)}
+                </TableCell>
+                <TableCell className="text-muted-foreground">{c.catatan || "-"}</TableCell>
+              </TableRow>
+            ))}
+          />
         </CardContent>
       </Card>
 
@@ -104,34 +95,30 @@ export function StatementCard({
           <CardTitle>Penempatan Modal</CardTitle>
         </CardHeader>
         <CardContent className="p-0 sm:p-0">
-          {fundings.length === 0 ? (
-            <div className="p-4">
-              <EmptyState message="Belum ada penempatan modal." />
-            </div>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Proyek</TableHead>
-                  <TableHead>Tanggal</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Jumlah</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {fundings.map((f) => (
-                  <TableRow key={f.id}>
-                    <TableCell className="font-medium">{f.projectNama}</TableCell>
-                    <TableCell>{displayDate(f.tanggal)}</TableCell>
-                    <TableCell>
-                      <StatusPill status={f.status} />
-                    </TableCell>
-                    <TableCell className="text-right tabular-nums">{formatRupiah(f.jumlah)}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
+          <DataTable
+            bordered={false}
+            searchPlaceholder="Cari penempatan…"
+            emptyMessage="Belum ada penempatan modal."
+            head={
+              <TableRow>
+                <TableHead>Proyek</TableHead>
+                <TableHead>Tanggal</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead className="text-right">Jumlah</TableHead>
+              </TableRow>
+            }
+            searchText={fundings.map((f) => `${f.projectNama} ${f.status} ${displayDate(f.tanggal)}`)}
+            rows={fundings.map((f) => (
+              <TableRow key={f.id}>
+                <TableCell className="font-medium">{f.projectNama}</TableCell>
+                <TableCell>{displayDate(f.tanggal)}</TableCell>
+                <TableCell>
+                  <StatusPill status={f.status} />
+                </TableCell>
+                <TableCell className="text-right tabular-nums">{formatRupiah(f.jumlah)}</TableCell>
+              </TableRow>
+            ))}
+          />
         </CardContent>
       </Card>
 
@@ -140,42 +127,38 @@ export function StatementCard({
           <CardTitle>Bagi Hasil</CardTitle>
         </CardHeader>
         <CardContent className="p-0 sm:p-0">
-          {distributions.length === 0 ? (
-            <div className="p-4">
-              <EmptyState message="Belum ada bagi hasil." />
-            </div>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Tanggal</TableHead>
-                  <TableHead>Proyek</TableHead>
-                  <TableHead className="text-right">Porsi (%)</TableHead>
-                  <TableHead className="text-right">Laba</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {distributions.map((d) => (
-                  <TableRow key={d.id}>
-                    <TableCell>{displayDate(d.tanggal)}</TableCell>
-                    <TableCell className="font-medium">{d.projectNama}</TableCell>
-                    <TableCell className="text-right tabular-nums">{d.porsi}</TableCell>
-                    <TableCell
-                      className={`text-right tabular-nums ${d.jumlahLaba < 0 ? "text-destructive" : "text-success"}`}
-                    >
-                      {formatRupiah(d.jumlahLaba)}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-              <TableFooter>
-                <TableRow>
-                  <TableCell colSpan={3}>Total</TableCell>
-                  <TableCell className="text-right tabular-nums">{formatRupiah(totalLaba)}</TableCell>
-                </TableRow>
-              </TableFooter>
-            </Table>
-          )}
+          <DataTable
+            bordered={false}
+            searchPlaceholder="Cari bagi hasil…"
+            emptyMessage="Belum ada bagi hasil."
+            head={
+              <TableRow>
+                <TableHead>Tanggal</TableHead>
+                <TableHead>Proyek</TableHead>
+                <TableHead className="text-right">Porsi (%)</TableHead>
+                <TableHead className="text-right">Laba</TableHead>
+              </TableRow>
+            }
+            searchText={distributions.map((d) => `${d.projectNama} ${displayDate(d.tanggal)}`)}
+            rows={distributions.map((d) => (
+              <TableRow key={d.id}>
+                <TableCell>{displayDate(d.tanggal)}</TableCell>
+                <TableCell className="font-medium">{d.projectNama}</TableCell>
+                <TableCell className="text-right tabular-nums">{d.porsi}</TableCell>
+                <TableCell
+                  className={`text-right tabular-nums ${d.jumlahLaba < 0 ? "text-destructive" : "text-success"}`}
+                >
+                  {formatRupiah(d.jumlahLaba)}
+                </TableCell>
+              </TableRow>
+            ))}
+            footer={
+              <TableRow>
+                <TableCell colSpan={3}>Total</TableCell>
+                <TableCell className="text-right tabular-nums">{formatRupiah(totalLaba)}</TableCell>
+              </TableRow>
+            }
+          />
         </CardContent>
       </Card>
     </div>
