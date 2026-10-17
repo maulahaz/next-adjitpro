@@ -1,0 +1,7 @@
+﻿ID,Username,PasswordHash,Salt,Nama,Role,InvestorID,Status,TanggalDibuat,LastLogin,Catatan,ThirdPartyID
+USR-0001,admin,ba3ef262441d6ef3b033d6c602be52fc104bf0940cfb3ec60dec699a3a8c2d6f,e9774cf268684be49b8921c505e540af,Administrator,admin,,Aktif,2026-10-17 00:00:00,2026-10-17 13:06:07,Akun default — segera ganti password.,
+USR-0003,abu_daffa,91f94362f407f38403b601fbbe05191fd0ce509bfaace706cbc73283460a8826,8cd4055979844cfa8c5b39f1d0658043,Abu Daffa,investor,INV-0001,Aktif,2026-10-17 00:00:00,2026-10-17 11:26:26,,
+USR-0004,adjit,a7ff9f71d4826897768521938c0f19510595e8083f9f94a77d3f384ca87005a6,29fd6c91763d4f25b1035075ef102b5e,AdjitPro Opr,operator,,Aktif,2026-10-17 00:00:00,2026-10-17 09:25:15,,
+USR-0005,jit,6d37c7a2fd488be5ade85e957fc74aebddb48b2bebc05518705d3c26f2c152e9,83079218775a4d6cba2276f69299e8cf,PT.JIT,client,,Aktif,2026-10-17 00:00:00,2026-10-17 13:04:44,,TP-0001
+USR-0006,abu_ahyar,f4faf12ded4d81103e801a3d540dd2244ad5a8b043ee4b094e287ad1948ee89e,2282cdc911434d92850b705d0c5e6cca,Abu Ahyar,investor,INV-0003,Aktif,2026-10-17 00:00:00,,,
+USR-0007,abu_rayyan,0d39f0afd5f9fef54d6f22a7b3ca0be37e2cc5d93d65efdaca13eb12780249f3,0eb5a24e7f424208b79c26a4ca148f47,Abu Rayyan,investor,INV-0002,Aktif,2026-10-17 00:00:00,2026-10-17 10:54:26,,

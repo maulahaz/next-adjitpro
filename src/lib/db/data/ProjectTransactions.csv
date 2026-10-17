@@ -1,0 +1,7 @@
+﻿ID,ProjectID,Tanggal,Tipe,Jumlah,Keterangan
+PT-0001,PRJ-0001,2026-10-16 00:00:00,Pendapatan,100000000,Profit setelah 6 bulan
+PT-0003,PRJ-0002,2025-07-30 00:00:00,Pendapatan,22243856,Sharing Profit 40%
+PT-0004,PRJ-0003,2026-10-16 00:00:00,Pendapatan,244042410,Sharing Profit 40%
+PT-0005,PRJ-0004,2026-08-30 00:00:00,Pendapatan,5406800,Sharing Profit 40%
+PT-0006,PRJ-0005,2026-03-30 00:00:00,Pendapatan,29198777,Sharing Profit 40%
+PT-0007,PRJ-0006,2026-10-17 00:00:00,Pendapatan,48985024,profit dari proyek

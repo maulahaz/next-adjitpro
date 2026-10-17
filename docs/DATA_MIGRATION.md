@@ -52,6 +52,7 @@ dengan header sheet, sehingga isinya mudah diperiksa dengan Excel/Notepad.
 ```powershell
 cd next-adjitpro
 npm run migrate:legacy -- --dir "C:\Users\Anda\Downloads\adjitpro-export" --dry-run
+npm run migrate:legacy -- --dir "E:\09 Projects\next-adjitpro\src\lib\db\data" --dry-run
 ```
 
 Mode `--dry-run` hanya membaca dan menghitung jumlah baris tiap tabel tanpa mengubah
@@ -64,6 +65,7 @@ database. Cocok untuk memastikan folder dan namanya benar.
 ```powershell
 # impor ke database yang sudah punya skema
 npm run migrate:legacy -- --dir "C:\Users\Anda\Downloads\adjitpro-export"
+npm run migrate:legacy -- --dir "E:\09 Projects\next-adjitpro\src\lib\db\data"
 
 # atau: kosongkan dulu seluruh tabel, lalu impor dari nol
 npm run migrate:legacy -- --dir "..." --wipe

@@ -1,0 +1,19 @@
+﻿ID,ProjectID,InvestorID,Porsi,JumlahLaba,Tanggal,Catatan
+PD-0001,PRJ-0001,INV-0001,30,30000000,2026-10-16 00:00:00,"Bagi hasil proyek Pembuatan Dapur MBG di Kp. Sawah, Tangerang"
+PD-0002,PRJ-0001,INV-0002,40,40000000,2026-10-16 00:00:00,"Bagi hasil proyek Pembuatan Dapur MBG di Kp. Sawah, Tangerang"
+PD-0003,PRJ-0001,INV-0003,30,30000000,2026-10-16 00:00:00,"Bagi hasil proyek Pembuatan Dapur MBG di Kp. Sawah, Tangerang"
+PD-0004,PRJ-0002,INV-0003,22.2222,4943079,2026-10-16 00:00:00,Bagi hasil proyek Akumulasi Project di PT.Sulfindo & PT.CAPC Periode 2024/2025
+PD-0005,PRJ-0002,INV-0001,33.3333,7414619,2026-10-16 00:00:00,Bagi hasil proyek Akumulasi Project di PT.Sulfindo & PT.CAPC Periode 2024/2025
+PD-0006,PRJ-0002,INV-0002,44.4444,9886158,2026-10-16 00:00:00,Bagi hasil proyek Akumulasi Project di PT.Sulfindo & PT.CAPC Periode 2024/2025
+PD-0007,PRJ-0003,INV-0002,44.4444,108463293,2026-10-16 00:00:00,"Bagi hasil proyek Repair Asphalt Foundation, PT.CAPC"
+PD-0008,PRJ-0003,INV-0001,33.3333,81347470,2026-10-16 00:00:00,"Bagi hasil proyek Repair Asphalt Foundation, PT.CAPC"
+PD-0009,PRJ-0003,INV-0003,22.2222,54231647,2026-10-16 00:00:00,"Bagi hasil proyek Repair Asphalt Foundation, PT.CAPC"
+PD-0010,PRJ-0004,INV-0001,33.3333,1802267,2026-10-16 00:00:00,"Bagi hasil proyek Additional Motor 75 Kw Dermaga Jetty2, PT.Multimas"
+PD-0011,PRJ-0004,INV-0002,44.4444,2403022,2026-10-16 00:00:00,"Bagi hasil proyek Additional Motor 75 Kw Dermaga Jetty2, PT.Multimas"
+PD-0012,PRJ-0004,INV-0003,22.2222,1201511,2026-10-16 00:00:00,"Bagi hasil proyek Additional Motor 75 Kw Dermaga Jetty2, PT.Multimas"
+PD-0013,PRJ-0005,INV-0002,44.4444,12977234,2026-10-16 00:00:00,"Bagi hasil proyek Repair Annular Plate & Asphalt Tank, PT.CAPC"
+PD-0014,PRJ-0005,INV-0001,33.3333,9732926,2026-10-16 00:00:00,"Bagi hasil proyek Repair Annular Plate & Asphalt Tank, PT.CAPC"
+PD-0015,PRJ-0005,INV-0003,22.2222,6488617,2026-10-16 00:00:00,"Bagi hasil proyek Repair Annular Plate & Asphalt Tank, PT.CAPC"
+PD-0016,PRJ-0006,INV-0001,25,12246256,2026-10-17 00:00:00,Bagi hasil proyek ShutDown UIC
+PD-0017,PRJ-0006,INV-0002,37.5,18369384,2026-10-17 00:00:00,Bagi hasil proyek ShutDown UIC
+PD-0018,PRJ-0006,INV-0003,37.5,18369384,2026-10-17 00:00:00,Bagi hasil proyek ShutDown UIC
