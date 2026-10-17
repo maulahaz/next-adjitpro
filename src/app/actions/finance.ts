@@ -1,0 +1,83 @@
+"use server";
+
+import { revalidatePath } from "next/cache";
+import { requireWrite } from "@/lib/auth/guard";
+import {
+  addCapitalTransaction,
+  closeProject,
+  deleteCapitalTransaction,
+  distributeProfit,
+} from "@/lib/services/finance";
+import { errorState, num, ok, str } from "@/lib/actions-util";
+import type { ActionState } from "@/lib/action-types";
+
+function revalidate(projectId?: string) {
+  revalidatePath("/capital");
+  revalidatePath("/dashboard");
+  revalidatePath("/investors");
+  revalidatePath("/distributions");
+  revalidatePath("/reports");
+  revalidatePath("/projects");
+  if (projectId) revalidatePath(`/projects/${projectId}`);
+}
+
+/** Tambah mutasi modal — pengganti `apiAddCapital`. */
+export async function addCapitalAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  try {
+    const session = await requireWrite();
+    const t = await addCapitalTransaction(
+      {
+        investorId: str(formData, "investorId"),
+        tanggal: str(formData, "tanggal"),
+        tipe: str(formData, "tipe"),
+        jumlah: num(formData, "jumlah"),
+        catatan: str(formData, "catatan"),
+      },
+      session.username,
+    );
+    revalidate();
+    return ok(`${t.tipe} modal disimpan.`);
+  } catch (err) {
+    return errorState(err);
+  }
+}
+
+/** Hapus mutasi modal — pengganti `apiDeleteCapital`. */
+export async function deleteCapitalAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  try {
+    const session = await requireWrite();
+    await deleteCapitalTransaction(str(formData, "id"), session.username);
+    revalidate();
+    return ok("Transaksi modal dihapus.");
+  } catch (err) {
+    return errorState(err);
+  }
+}
+
+/** Bagi hasil proyek — pengganti `apiDistributeProfit`. */
+export async function distributeProfitAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  try {
+    const session = await requireWrite();
+    const projectId = str(formData, "projectId");
+    const result = await distributeProfit(projectId, str(formData, "tanggal"), session.username);
+    revalidate(projectId);
+    return ok(
+      `Bagi hasil proyek ${result.project} selesai. Laba dibagikan: ${result.laba.toLocaleString("id-ID")}.`,
+    );
+  } catch (err) {
+    return errorState(err);
+  }
+}
+
+/** Tutup proyek — pengganti `apiCloseProject`. */
+export async function closeProjectAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  try {
+    const session = await requireWrite();
+    const projectId = str(formData, "projectId");
+    await closeProject(projectId, session.username);
+    revalidate(projectId);
+    return ok("Proyek ditutup. Modal dibebaskan untuk proyek berikutnya.");
+  } catch (err) {
+    return errorState(err);
+  }
+}
