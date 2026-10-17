@@ -159,6 +159,10 @@ Perbedaan teknis yang disengaja:
   oleh **semua** daftar data: paginasi maksimum **10 baris/halaman** + kotak **pencarian**
   yang muncul otomatis bila data lebih dari satu halaman, dengan toolbar aksi/filter dan
   baris Total (bila ada). Lihat PRD §7.16.
+- **Standar format persen**: semua kolom **Porsi (%)** (Bagi Hasil, Laporan, Kartu Investor,
+  detail proyek, ekspor CSV) memakai `formatPorsi()` — dibulatkan **ke atas** sampai
+  **maksimal 2 desimal** tanpa memaksa nol di belakang, desimal koma (mis. `37,5`, `25`,
+  `6,2522` → `6,26`). Lihat PRD §7.17.
 - Sesi disimpan di tabel + cookie `httpOnly` `adjitpro_session` (bukan `CacheService`),
   agar konsisten di lingkungan serverless dan bisa dicabut saat logout.
 - Password lama (`sha256(salt + "::" + password)`) **tetap bisa login** dan otomatis
@@ -171,7 +175,7 @@ Perbedaan teknis yang disengaja:
 ## 6. Pengujian
 
 ```powershell
-npm test          # 36 uji: 24 logika murni + 12 integrasi PostgreSQL
+npm test          # 37 uji: 25 logika murni + 12 integrasi PostgreSQL
 ```
 
 Uji integrasi otomatis dilewati bila `DATABASE_URL` tidak tersedia, sehingga

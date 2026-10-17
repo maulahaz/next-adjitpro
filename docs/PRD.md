@@ -5,9 +5,9 @@
 | | |
 | --- | --- |
 | **Produk** | AdjitPro — Aplikasi Pencatatan Keuangan Investasi |
-| **Versi dokumen** | 1.4 |
+| **Versi dokumen** | 1.5 |
 | **Tanggal** | 17 Oktober 2026 |
-| **Status** | Disetujui — v1.1 menambah **Ledger Proyek** (§7.15); v1.2 memindahkan buat/ubah/hapus **proyek** ke admin+client (§6.1, §7.7); v1.3 menambah kolom **deskripsi** & tampilan tabel ledger; v1.4 menetapkan **standar tabel** (pencarian + paginasi 10 baris) untuk semua daftar (§7.16) |
+| **Status** | Disetujui — v1.1 menambah **Ledger Proyek** (§7.15); v1.2 memindahkan buat/ubah/hapus **proyek** ke admin+client (§6.1, §7.7); v1.3 menambah kolom **deskripsi** & tampilan tabel ledger; v1.4 menetapkan **standar tabel** (§7.16); v1.5 menetapkan **standar format persen** maksimal 2 desimal ke atas, tanpa memaksa nol (§7.17) |
 | **Platform** | Web (Next.js 15 App Router), responsif mobile → desktop |
 | **Bahasa** | Antarmuka & pesan kesalahan: Bahasa Indonesia |
 | **Dokumen terkait** | [`README.md`](../README.md) · [`MIGRATION_PLAN.md`](MIGRATION_PLAN.md) · [`INSTALL.md`](INSTALL.md) · [`DATA_MIGRATION.md`](DATA_MIGRATION.md) · [`DEPLOYMENT.md`](DEPLOYMENT.md) |
@@ -374,6 +374,19 @@ Kode persyaratan dipakai sebagai rujukan uji & pelacakan.
 | FR-UI-TABLE-05 | Baris **Total/Net** (bila ada) tetap ditampilkan sebagai footer tabel dan dihitung dari seluruh data. | Sebaiknya |
 | FR-UI-TABLE-06 | Saat pencarian tidak menemukan hasil, tampilkan pesan kosong yang jelas; saat data kosong, tampilkan pesan kosong bawaan halaman. | Wajib |
 
+### 7.17 Standar format persen (`FR-UI-PERSEN`) — standar v1.5
+
+> **Standar tunggal** untuk **semua** tampilan persen (kolom `Porsi (%)` pada Bagi
+> Hasil, Laporan, Kartu Investor, detail proyek, dan ekspor CSV). Diterapkan lewat
+> `formatPorsi()` di `src/lib/domain/money.ts`.
+
+| ID | Kebutuhan | Prioritas |
+| --- | --- | --- |
+| FR-UI-PERSEN-01 | Persen ditampilkan dengan **maksimal 2 desimal**; nol di belakang **tidak dipaksa**. Contoh: `37,5`, `25`, `6,26`. | Wajib |
+| FR-UI-PERSEN-02 | Pembulatan dilakukan **ke atas** (ceiling) sampai desimal ke-2. Contoh: `6,2522` → `6,26`; `33,3333` → `33,34`. | Wajib |
+| FR-UI-PERSEN-03 | Desimal memakai **koma** (gaya Indonesia), konsisten dengan format Rupiah. | Wajib |
+| FR-UI-PERSEN-04 | Berlaku juga pada kolom **Porsi (%)** di **ekspor CSV**. | Wajib |
+
 ---
 
 ## 8. Aturan validasi & pesan kesalahan
@@ -594,7 +607,7 @@ Rilis dinyatakan memenuhi syarat bila seluruh poin berikut terbukti.
 
 ### 12.4 Kualitas teknis
 
-- [ ] `npm test` lulus seluruhnya (**36 uji**: 24 domain + 12 integrasi).
+- [ ] `npm test` lulus seluruhnya (**37 uji**: 25 domain + 12 integrasi).
 - [ ] `npm run typecheck` bersih.
 - [ ] `npm run build` sukses.
 - [ ] Migrasi data lama menghasilkan saldo identik & ID tidak berubah.

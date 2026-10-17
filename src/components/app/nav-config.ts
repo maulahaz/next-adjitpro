@@ -23,7 +23,8 @@ export interface NavItem {
 /** Menu identik dengan `NAV_ITEMS` di aplikasi lama (+ Ganti Password). */
 export const NAV_ITEMS: NavItem[] = [
   { href: "/dashboard", label: "Dashboard", roles: ["admin", "operator", "investor"], icon: LayoutDashboard },
-  { href: "/my-card", label: "Kartu Saya", roles: ["investor"], icon: CreditCard },
+  // { href: "/my-card", label: "Kartu Saya", roles: ["investor"], icon: CreditCard },
+  { href: "/my-card", label: "Overview Saya", roles: ["investor"], icon: CreditCard },
   { href: "/my-projects", label: "Proyek Saya", roles: ["client"], icon: FolderKanban },
   { href: "/investors", label: "Investor", roles: ["admin", "operator"], icon: Users },
   { href: "/projects", label: "Proyek", roles: ["admin", "operator"], icon: Briefcase },

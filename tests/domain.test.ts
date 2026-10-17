@@ -179,6 +179,20 @@ describe("format & konversi angka", () => {
     expect(pad(7, 4)).toBe("0007");
     expect(formatPorsi(37.5)).toBe("37,5");
     expect(formatPorsi(100)).toBe("100");
+    expect(formatPorsi(0)).toBe("0");
+  });
+
+  it("formatPorsi membulatkan ke atas maksimal 2 desimal tanpa nol di belakang", () => {
+    // Sudah 2 desimal -> tidak berubah.
+    expect(formatPorsi(6.25)).toBe("6,25");
+    // Pecahan di atas 2 desimal -> digenapkan ke atas.
+    expect(formatPorsi(6.2522)).toBe("6,26");
+    expect(formatPorsi(33.3333)).toBe("33,34");
+    expect(formatPorsi(0.0001)).toBe("0,01");
+    // Tanpa paksa 2 desimal: nol di belakang dibuang.
+    expect(formatPorsi(25)).toBe("25");
+    expect(formatPorsi(1.1)).toBe("1,1");
+    expect(formatPorsi(1.15)).toBe("1,15");
   });
 });
 

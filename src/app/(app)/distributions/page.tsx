@@ -2,7 +2,7 @@ import { requireRolesPage } from "@/lib/auth/guard";
 import { listDistributions } from "@/lib/services/finance";
 import { PageHeader, StatCard } from "@/components/app/ui-helpers";
 import { DataTable } from "@/components/app/data-table";
-import { formatRupiah } from "@/lib/domain/money";
+import { formatRupiah, formatPorsi } from "@/lib/domain/money";
 import { displayDate } from "@/lib/domain/dates";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { TableCell, TableHead, TableRow } from "@/components/ui/table";
@@ -60,7 +60,7 @@ export default async function DistributionsPage() {
                 <TableCell>{displayDate(d.tanggal)}</TableCell>
                 <TableCell className="font-medium">{d.projectNama}</TableCell>
                 <TableCell>{d.investorNama}</TableCell>
-                <TableCell className="text-right tabular-nums">{d.porsi}</TableCell>
+                <TableCell className="text-right tabular-nums">{formatPorsi(d.porsi)}</TableCell>
                 <TableCell
                   className={`text-right tabular-nums ${d.jumlahLaba < 0 ? "text-destructive" : "text-success"}`}
                 >

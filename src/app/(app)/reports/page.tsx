@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Download } from "lucide-react";
 import { requireRolesPage } from "@/lib/auth/guard";
 import { getReports } from "@/lib/services/reports";
-import { formatRupiah } from "@/lib/domain/money";
+import { formatRupiah, formatPorsi } from "@/lib/domain/money";
 import { displayDate } from "@/lib/domain/dates";
 import { PageHeader, StatCard, StatusPill } from "@/components/app/ui-helpers";
 import { DataTable } from "@/components/app/data-table";
@@ -183,7 +183,7 @@ export default async function ReportsPage() {
                 <TableCell>{displayDate(d.tanggal)}</TableCell>
                 <TableCell className="font-medium">{d.projectNama}</TableCell>
                 <TableCell>{d.investorNama}</TableCell>
-                <TableCell className="text-right tabular-nums">{d.porsi}</TableCell>
+                <TableCell className="text-right tabular-nums">{formatPorsi(d.porsi)}</TableCell>
                 <TableCell className="text-right tabular-nums">{formatRupiah(d.jumlahLaba)}</TableCell>
               </TableRow>
             ))}

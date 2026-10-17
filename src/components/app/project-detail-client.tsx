@@ -17,7 +17,7 @@ import {
   removeFundingAction,
 } from "@/app/actions/projects";
 import { closeProjectAction, distributeProfitAction } from "@/app/actions/finance";
-import { formatRupiah } from "@/lib/domain/money";
+import { formatRupiah, formatPorsi } from "@/lib/domain/money";
 import { computeLedgerTotals } from "@/lib/domain/ledger-totals";
 import { displayDate, todayStr } from "@/lib/domain/dates";
 import type { ProjectDetailDTO } from "@/lib/services/projects";
@@ -380,7 +380,7 @@ export function ProjectDetailClient({ detail }: { detail: ProjectDetailDTO }) {
                 <TableRow key={d.id}>
                   <TableCell className="font-medium">{d.investorNama}</TableCell>
                   <TableCell>{displayDate(d.tanggal)}</TableCell>
-                  <TableCell className="text-right tabular-nums">{d.porsi}</TableCell>
+                  <TableCell className="text-right tabular-nums">{formatPorsi(d.porsi)}</TableCell>
                   <TableCell
                     className={`text-right tabular-nums ${d.jumlahLaba < 0 ? "text-destructive" : "text-success"}`}
                   >

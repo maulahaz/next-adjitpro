@@ -1,4 +1,4 @@
-import { formatRupiah } from "@/lib/domain/money";
+import { formatRupiah, formatPorsi } from "@/lib/domain/money";
 import { displayDate } from "@/lib/domain/dates";
 import { PrintButton } from "@/components/app/print-button";
 import { DataTable } from "@/components/app/data-table";
@@ -144,7 +144,7 @@ export function StatementCard({
               <TableRow key={d.id}>
                 <TableCell>{displayDate(d.tanggal)}</TableCell>
                 <TableCell className="font-medium">{d.projectNama}</TableCell>
-                <TableCell className="text-right tabular-nums">{d.porsi}</TableCell>
+                <TableCell className="text-right tabular-nums">{formatPorsi(d.porsi)}</TableCell>
                 <TableCell
                   className={`text-right tabular-nums ${d.jumlahLaba < 0 ? "text-destructive" : "text-success"}`}
                 >

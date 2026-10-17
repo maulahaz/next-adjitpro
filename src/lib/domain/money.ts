@@ -39,13 +39,22 @@ export function formatNumber(n: unknown): string {
     .replace(/\B(?=(\d{3})+(?!\d))/g, ".");
 }
 
-/** Persentase porsi: 37.5 -> "37,5" (desimal koma, gaya Indonesia). */
+/**
+ * Format persentase: dibulatkan **ke atas** (ceiling) sampai **maksimal 2 desimal**,
+ * tanpa memaksa 2 desimal (nol di belakang dibuang), desimal koma (gaya Indonesia),
+ * pemisah ribuan titik. **Standar seragam** untuk semua kolom persen (`Porsi (%)`).
+ * Contoh: 37.5 -> "37,5"; 6.2522 -> "6,26"; 33.3333 -> "33,34"; 25 -> "25".
+ */
 export function formatPorsi(n: unknown): string {
-  const v = toNum(n);
-  const rounded = Math.round(v * 10000) / 10000;
-  const [int, dec] = String(rounded).split(".");
-  const intFmt = int.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
-  return dec ? `${intFmt},${dec}` : intFmt;
+  // Kerjakan dalam satuan sepersejuta agar pembulatan ke atas bebas galat floating point.
+  const micro = Math.round(toNum(n) * 1_000_000);
+  const scaled = Math.ceil(micro / 10_000); // 2 desimal, ke atas
+  const neg = scaled < 0;
+  const abs = Math.abs(scaled);
+  const intFmt = String(Math.floor(abs / 100)).replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+  // Tanpa paksa 2 desimal: buang nol di belakang (mis. "50" -> "5", "00" -> "").
+  const dec = String(abs % 100).padStart(2, "0").replace(/0+$/, "");
+  return `${neg ? "-" : ""}${intFmt}${dec ? "," + dec : ""}`;
 }
 
 /**

@@ -3,6 +3,7 @@ import { getSessionUser } from "@/lib/auth/session";
 import { canWrite } from "@/lib/domain/permissions";
 import { getReportsScoped } from "@/lib/services/reports";
 import { displayDate } from "@/lib/domain/dates";
+import { formatPorsi } from "@/lib/domain/money";
 
 export const dynamic = "force-dynamic";
 
@@ -77,7 +78,7 @@ export async function GET(req: NextRequest) {
       displayDate(d.tanggal),
       d.projectNama,
       d.investorNama,
-      d.porsi,
+      formatPorsi(d.porsi),
       d.jumlahLaba,
     ]);
     return csvResponse("bagi-hasil.csv", toCsv(headers, rows));

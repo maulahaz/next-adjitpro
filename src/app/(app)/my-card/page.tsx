@@ -21,5 +21,6 @@ export default async function MyCardPage() {
     return <EmptyState message="Data investor tidak ditemukan. Hubungi administrator." />;
   }
 
-  return <StatementCard statement={statement} title="Kartu Saya" />;
+  // return <StatementCard statement={statement} title="Kartu Saya" />;
+  return <StatementCard statement={statement} title="Overview" />;
 }
