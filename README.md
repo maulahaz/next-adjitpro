@@ -1,11 +1,6 @@
 # AdjitPro — Aplikasi Pencatatan Keuangan Investasi (Next.js)
 
-Versi modern dari aplikasi Google Apps Script **"AdjitPro — Aplikasi Pencatatan Keuangan Investasi"**
-di folder induk. Semua fitur, aturan bisnis, aturan validasi, pesan kesalahan Bahasa
-Indonesia, dan pembagian peran dipertahankan.
-
-**Tumpukan teknologi:** Next.js 15 (App Router) · React 19 · TypeScript · PostgreSQL ·
-Drizzle ORM · Tailwind CSS 3 · shadcn/ui · Vitest.
+**Teknologi:** Next.js 15 (App Router) · React 19 · TypeScript · PostgreSQL · Drizzle ORM · Tailwind CSS 3 · shadcn/ui · Vitest.
 
 ---
 
@@ -23,10 +18,10 @@ Drizzle ORM · Tailwind CSS 3 · shadcn/ui · Vitest.
 | **Pengguna** | Kelola akun (khusus admin): peran, tautan ke investor/pihak ketiga, reset password, aktif/nonaktif. |
 | **Kartu Saya** | Halaman investor: statement dirinya sendiri. |
 | **Proyek Saya** | Halaman client: daftar proyek milik pihak ketiganya. Client dapat **menambah/mengubah/menghapus proyeknya** di sini (pihak ketiga terisi otomatis) dan membuka **Buka Ledger** per proyek. |
-| **Ledger Proyek** | Ledger **Debet/Kredit** per proyek (fitur baru, bukan dari aplikasi lama). Ditampilkan sebagai tabel **No · Tanggal · Deskripsi · Debet · Kredit · Keterangan** (nilai masuk ke kolom Debet/Kredit sesuai jenis) dengan baris **Total**. **Hanya peran `client`** yang dapat menambah/ubah/menghapus entri — dan hanya untuk proyek milik pihak ketiganya. Peran lain hanya **membaca** (read-only) di detail proyek. |
+| **Ledger Proyek** | Ledger **Debet/Kredit** per proyek. Ditampilkan sebagai tabel **No · Tanggal · Deskripsi · Debet · Kredit · Keterangan** (nilai masuk ke kolom Debet/Kredit sesuai jenis) dengan baris **Total**. **Hanya peran `client`** yang dapat menambah/ubah/menghapus entri — dan hanya untuk proyek milik pihak ketiganya. Peran lain hanya **membaca** (read-only) di detail proyek. |
 | **Ganti Password** | Setiap pengguna dapat mengganti password sendiri (wajib tahu password lama). |
 
-### Aturan bisnis inti (sama persis dengan aplikasi lama)
+### Aturan bisnis inti
 
 1. **Bagi hasil pro-rata** menurut porsi modal yang ditempatkan di proyek
    (`allocateProRata`, metode *largest remainder*), sehingga jumlah bagian **selalu**
@@ -36,9 +31,9 @@ Drizzle ORM · Tailwind CSS 3 · shadcn/ui · Vitest.
 3. **Modal pokok berputar** — yang dibagikan hanya laba. Saat proyek **Ditutup**, semua
    penempatan dibebaskan (`Aktif` → `Dibebaskan`) sehingga modal bisa dipakai proyek berikutnya.
 4. **Uang Rupiah bilangan bulat** (`bigint`, tanpa desimal). Porsi disimpan `numeric(9,4)`.
-5. **ID tetap format lama** (`INV-0001`, `PRJ-0001`, …) dan bersifat atomik via tabel `counters`.
+5. **ID format** (`INV-0001`, `PRJ-0001`, …) dan bersifat atomik via tabel `counters`.
 6. Penarikan modal tidak boleh melebihi **saldo idle**; penempatan modal juga tidak boleh
-   melebihi saldo idle. Pesan validasi identik dengan versi lama.
+   melebihi saldo idle.
 7. Proyek berlaba **wajib dibagikan** sebelum bisa ditutup, dan tidak bisa dibagikan dua kali.
 
 ### Peran & menu
@@ -98,7 +93,7 @@ Panduan lebih rinci: [`docs/INSTALL.md`](docs/INSTALL.md).
 | `npm run db:studio` | Buka Drizzle Studio. |
 | `npm run db:seed` | Pastikan akun admin default ada (idempoten). |
 | `npm run db:reset` | Kosongkan semua data + admin default (khusus dev). |
-| `npm run migrate:legacy -- --dir "<folder>"` | Impor data dari aplikasi Google Sheets lama. |
+| `npm run migrate:legacy -- --dir "<folder>"` | Impor data dari aplikasi Google Sheets. |
 
 ---
 
@@ -108,7 +103,7 @@ Panduan lebih rinci: [`docs/INSTALL.md`](docs/INSTALL.md).
 next-adjitpro/
 ├─ docs/                  INSTALL · DATA_MIGRATION · DEPLOYMENT · MIGRATION_PLAN
 ├─ drizzle/               File migrasi SQL (hasil drizzle-kit generate)
-├─ legacy/ExportData.gs   Alat bantu ekspor CSV dari Apps Script lama
+├─ legacy/ExportData.gs   Alat bantu ekspor CSV dari Apps Script
 ├─ scripts/               seed · reset · migrate-legacy
 ├─ src/
 │  ├─ app/                Halaman (App Router) + Server Actions + route export CSV
@@ -129,7 +124,7 @@ next-adjitpro/
 
 ---
 
-## 5. Pemetaan dari aplikasi lama
+## 5. Pemetaan dari aplikasi sebelumnya (Google App Script)
 
 | Berkas Apps Script lama | Padanannya sekarang |
 | --- | --- |
@@ -148,8 +143,7 @@ next-adjitpro/
 
 Perbedaan teknis yang disengaja:
 
-- **Ledger Proyek** adalah modul **baru** (tidak ada di aplikasi lama) sehingga
-  memakai primary key `serial` (auto increment) alih-alih format ID teks lama;
+- **Ledger Proyek** adalah modul **baru** yang memakai primary key `serial` (auto increment);
   akses tulisnya khusus peran `client` untuk proyek miliknya.
 - **Sebagian kepemilikan proyek diserahkan ke client**: peran `client` dapat
   membuat/mengubah/menghapus proyek **miliknya** (pihak ketiga terisi otomatis)
