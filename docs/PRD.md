@@ -158,7 +158,7 @@ Contoh ini menjadi **kasus uji wajib** (lihat §12 dan `tests/domain.test.ts`).
 | --- | --- | --- |
 | `admin` | Pengelola | Semua operasi **+ kelola pengguna** |
 | `operator` | Staf operasional | Semua data (baca & tulis) **kecuali buat/ubah/hapus proyek** (read-only), tanpa kelola pengguna |
-| `investor` | Pemodal | **Read-only**, **hanya data miliknya** (Dashboard ter-scope + Kartu Saya) |
+| `investor` | Pemodal | **Read-only**, **hanya data miliknya** (Dashboard ter-scope + Kartu Saya) + **detail proyek yang ia danai** (read-only, tanpa aksi tulis) |
 | `client` | Rekanan/pihak ketiga | Proyek milik pihak ketiganya: **baca** status/periode **dan tulis (buat/ubah/hapus) proyek miliknya** (pihak ketiga otomatis); **tulis (CRUD) Ledger Proyek** miliknya. **Tidak** melihat data keuangan internal (modal, pendapatan, biaya, laba, bagi hasil). |
 
 ### 6.1 Daftar otorisasi (port dari `rolesWrite`/`rolesRead`/`rolesAdmin`)
@@ -176,8 +176,9 @@ Contoh ini menjadi **kasus uji wajib** (lihat §12 dan `tests/domain.test.ts`).
 | Dashboard | ✔ | ✔ | ✔ *(data sendiri)* | ✖ |
 | Kartu Saya | ✖ | ✖ | ✔ | ✖ |
 | Proyek Saya | ✖ | ✖ | ✖ | ✔ *(buat/ubah/hapus proyek sendiri + Ledger)* |
-| Ledger Proyek | ✔ *(baca, di detail proyek)* | ✔ *(baca, di detail proyek)* | ✖ | ✔ *CRUD, proyek sendiri* |
+| Ledger Proyek | ✔ *(baca, di detail proyek)* | ✔ *(baca, di detail proyek)* | ✔ *(baca, di detail proyek yang ia danai)* | ✔ *CRUD, proyek sendiri* |
 | Proyek (daftar internal) | ✔ *(buat/ubah/hapus)* | ✔ *(baca)* | ✖ | ✖ |
+| Detail Proyek | ✔ | ✔ | ✔ *(hanya proyek yang ia danai, read-only)* | ✖ |
 | Investor / Mutasi Modal / Bagi Hasil / Laporan / Pihak Ketiga | ✔ | ✔ | ✖ | ✖ |
 | Pengguna | ✔ | ✖ | ✖ | ✖ |
 | Ganti Password | ✔ | ✔ | ✔ | ✔ |
@@ -187,7 +188,7 @@ Contoh ini menjadi **kasus uji wajib** (lihat §12 dan `tests/domain.test.ts`).
 | # | Aturan |
 | --- | --- |
 | AC-1 | Investor: Dashboard, daftar investor, mutasi modal, bagi hasil, laporan, kartu — **ter-scope** ke `investorId` miliknya. |
-| AC-2 | Investor: **ditolak** mengakses detail proyek. |
+| AC-2 | Investor: hanya boleh mengakses **detail proyek yang ia danai** (read-only, tanpa aksi tulis); proyek lain **ditolak** (`notFound`). |
 | AC-3 | Client: hanya boleh mengakses daftar proyek milik `thirdPartyId`-nya — **tanpa field keuangan internal** (modal, pendapatan, biaya, laba, bagi hasil). |
 | AC-4 | Client: **ditolak** untuk dashboard, investor, laporan, detail proyek, dan operasi tulis selain **proyek miliknya** dan **Ledger Proyek**-nya (lihat AC-7, AC-8). |
 | AC-5 | Endpoint tulis **proyek** diizinkan untuk `[admin, client]`; endpoint tulis lain menolak peran selain `admin`/`operator`; Ledger Proyek justru menolak peran selain `client`. |
@@ -403,7 +404,7 @@ Kode persyaratan dipakai sebagai rujukan uji & pelacakan.
 | Akun nonaktif | `Akun tidak aktif. Hubungi administrator.` |
 | Sesi habis | `Sesi tidak valid atau sudah berakhir. Silakan login kembali.` |
 | Tanpa hak akses | `Anda tidak memiliki hak akses untuk aksi ini.` |
-| Detail proyek (investor) | `Anda tidak memiliki hak akses untuk detail proyek.` |
+| Detail proyek (investor bukan pendana) | Tidak ada pesan — halaman mengembalikan **404** (`notFound`). |
 | Scope data | `Anda hanya dapat melihat data Anda sendiri.` |
 | Ganti password akun orang lain | `Gunakan menu "Ganti Password" untuk akun Anda sendiri.` |
 | Password lama salah | `Password lama salah.` |
@@ -596,7 +597,7 @@ Rilis dinyatakan memenuhi syarat bila seluruh poin berikut terbukti.
 
 ### 12.3 Peran & keamanan
 
-- [ ] Investor hanya menerima data miliknya; akses detail proyek ditolak.
+- [ ] Investor hanya menerima data miliknya; **detail proyek** hanya dapat dibuka untuk proyek yang **ia danai** (read-only, tanpa aksi tulis), proyek lain 404.
 - [ ] Client hanya menerima nama/periode/status proyeknya (tanpa data keuangan internal) dan entri Ledger Proyek miliknya.
 - [ ] Client hanya dapat menulis pada **proyek miliknya** dan **Ledger Proyek** miliknya; investor & operator tidak dapat menambah/mengubah/menghapus proyek (ditolak di server).
 - [ ] Client membuat proyek → tertaut otomatis ke pihak ketiganya (tanpa memilih dropdown).
@@ -607,7 +608,7 @@ Rilis dinyatakan memenuhi syarat bila seluruh poin berikut terbukti.
 
 ### 12.4 Kualitas teknis
 
-- [ ] `npm test` lulus seluruhnya (**37 uji**: 25 domain + 12 integrasi).
+- [ ] `npm test` lulus seluruhnya (**38 uji**: 25 domain + 13 integrasi).
 - [ ] `npm run typecheck` bersih.
 - [ ] `npm run build` sukses.
 - [ ] Migrasi data lama menghasilkan saldo identik & ID tidak berubah.

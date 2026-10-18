@@ -138,7 +138,7 @@ export default async function DashboardPage() {
               rows={data.projects.map((p) => (
                 <TableRow key={p.id}>
                   <TableCell>
-                    <div className="font-medium">{p.nama}</div>
+                    <Link href={`/projects/${p.id}`}><div className="font-medium">{p.nama}</div></Link>
                     <div className="text-xs text-muted-foreground">
                       {p.pihakKetigaNama || "tanpa pihak ketiga"}
                     </div>

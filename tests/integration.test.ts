@@ -16,7 +16,7 @@ import { eq } from "drizzle-orm";
 
 import { saveInvestor, listInvestors } from "@/lib/services/investors";
 import { saveThirdParty } from "@/lib/services/third-parties";
-import { saveProject, addFunding, addProjectTransaction, listProjectsEnriched, deleteProject } from "@/lib/services/projects";
+import { saveProject, addFunding, addProjectTransaction, listProjectsEnriched, deleteProject, investorFundsProject } from "@/lib/services/projects";
 import { addCapitalTransaction, distributeProfit, closeProject } from "@/lib/services/finance";
 import { loadBalances } from "@/lib/services/ledger";
 import { listProjectLedgers, saveProjectLedger, deleteProjectLedger } from "@/lib/services/project-ledgers";
@@ -182,6 +182,20 @@ describe.skipIf(!hasDb)("integrasi: alur keuangan lengkap", () => {
 
     // pihak ketiga kosong -> array kosong (tidak membocorkan proyek tanpa pihak ketiga).
     expect(await listProjectsForClient("")).toEqual([]);
+  });
+
+  it("investor hanya boleh mengakses detail proyek yang ia danai", async () => {
+    const inv = await saveInvestor({ nama: "I" }, "test");
+    const other = await saveInvestor({ nama: "J" }, "test");
+    await addCapitalTransaction({ investorId: inv.id, tipe: "Setor", jumlah: 10000000 }, "test");
+    await addCapitalTransaction({ investorId: other.id, tipe: "Setor", jumlah: 10000000 }, "test");
+    const project = await saveProject({ nama: "Proyek H" }, "test");
+    await addFunding({ projectId: project.id, investorId: inv.id, jumlah: 10000000 }, "test");
+
+    // Ikut mendanai -> boleh; bukan pendana -> ditolak (gate read-only detail proyek).
+    expect(await investorFundsProject(project.id, inv.id)).toBe(true);
+    expect(await investorFundsProject(project.id, other.id)).toBe(false);
+    expect(await investorFundsProject(project.id, "")).toBe(false);
   });
 
   it("kelola pengguna: investor wajib tertaut, client wajib tertaut pihak ketiga", async () => {

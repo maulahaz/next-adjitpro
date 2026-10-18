@@ -27,21 +27,29 @@ const TIPE_OPTIONS = [
   { value: "Biaya", label: "Biaya" },
 ];
 
-export function ProjectDetailClient({ detail }: { detail: ProjectDetailDTO }) {
+export function ProjectDetailClient({
+  detail,
+  canWrite,
+}: {
+  detail: ProjectDetailDTO;
+  /** `false` untuk peran read-only (investor) — menyembunyikan seluruh aksi tulis. */
+  canWrite: boolean;
+}) {
   const { project, totals, fundings, transactions, distributions, ledgers, availableInvestors } = detail;
 
   const ledgerTotals = computeLedgerTotals(ledgers);
 
   const locked = project.status === "Ditutup";
   const sudahDibagikan = totals.sudahDibagikan;
-  const canEdit = !locked && !sudahDibagikan;
+  const canEdit = canWrite && !locked && !sudahDibagikan;
 
   return (
     <div className="space-y-6">
       <div className="no-print">
         <Button asChild variant="ghost" size="sm">
-          <Link href="/projects">
-            <ArrowLeft className="h-4 w-4" /> Kembali ke daftar proyek
+          <Link href={canWrite ? "/projects" : "/dashboard"}>
+            <ArrowLeft className="h-4 w-4" />{" "}
+            {canWrite ? "Kembali ke daftar proyek" : "Kembali ke dashboard"}
           </Link>
         </Button>
       </div>
@@ -61,7 +69,7 @@ export function ProjectDetailClient({ detail }: { detail: ProjectDetailDTO }) {
           ) : null}
         </div>
 
-        {!locked ? (
+        {!locked && canWrite ? (
           <div className="flex flex-wrap gap-2">
             <FormDialog
               trigger={

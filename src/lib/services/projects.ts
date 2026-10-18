@@ -3,7 +3,7 @@
  * Port dari `Projects.gs`.
  */
 
-import { asc, eq } from "drizzle-orm";
+import { and, asc, eq } from "drizzle-orm";
 import { db, type DbOrTx } from "@/lib/db";
 import {
   investors,
@@ -263,6 +263,25 @@ export async function computeTotalsFor(projectId: string, tx: DbOrTx = db) {
     tx.select().from(profitDistributions).where(eq(profitDistributions.projectId, projectId)),
   ]);
   return computeProjectTotals(funds, txns, dists);
+}
+
+/**
+ * Apakah `investorId` turut serta dalam penempatan modal (`project_funding`)
+ * proyek ini. Dipakai untuk memberikan akses **read-only** detail proyek kepada
+ * investor yang ikut mendanai (investor lain tetap ditolak).
+ */
+export async function investorFundsProject(
+  projectId: string,
+  investorId: string,
+  tx: DbOrTx = db,
+): Promise<boolean> {
+  if (!projectId || !investorId) return false;
+  const rows = await tx
+    .select({ id: projectFunding.id })
+    .from(projectFunding)
+    .where(and(eq(projectFunding.projectId, projectId), eq(projectFunding.investorId, investorId)))
+    .limit(1);
+  return rows.length > 0;
 }
 
 export async function getProjectDetail(projectId: string): Promise<ProjectDetailDTO> {

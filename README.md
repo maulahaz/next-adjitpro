@@ -11,7 +11,7 @@
 | **Dashboard** | Total modal, modal terpakai, idle, laba dibagikan, proyek aktif, posisi tiap investor, daftar proyek. Investor hanya melihat data dirinya sendiri. |
 | **Investor** | Master data pemodal + aksi cepat **Setor/Tarik** modal + tombol **Kartu** (statement yang bisa dicetak/PDF). |
 | **Pihak Ketiga** | Master data rekanan proyek. Dipakai untuk menautkan pengguna berperan `client`. |
-| **Proyek** | Master proyek, penempatan modal (funding), transaksi proyek (pendapatan/biaya), **Bagi Hasil**, **Tutup Proyek**. Buat/ubah/hapus proyek dilakukan **admin** (di sini) dan **client** (di Proyek Saya); operator read-only. |
+| **Proyek** | Master proyek, penempatan modal (funding), transaksi proyek (pendapatan/biaya), **Bagi Hasil**, **Tutup Proyek**. Buat/ubah/hapus proyek dilakukan **admin** (di sini) dan **client** (di Proyek Saya); operator read-only. **Investor** dapat membuka **detail proyek** (read-only, tanpa aksi) untuk proyek yang ia danai. |
 | **Mutasi Modal** | Riwayat setoran/penarikan modal, filter per investor, rekap netto. |
 | **Bagi Hasil** | Riwayat pembagian laba per proyek per investor beserta porsi (%). |
 | **Laporan** | Rekap investor, rekap proyek, riwayat bagi hasil, **export CSV**, dan **cetak**. |
@@ -43,8 +43,9 @@
 | Dashboard | ✔ | ✔ | ✔ (data sendiri) | ✖ |
 | Kartu Saya | ✖ | ✖ | ✔ | ✖ |
 | Proyek (daftar internal) | ✔ (buat/ubah/hapus) | ✔ (baca) | ✖ | ✖ |
+| Detail Proyek | ✔ | ✔ | ✔ (hanya proyek yang ia danai, read-only) | ✖ |
 | Proyek Saya | ✖ | ✖ | ✖ | ✔ (buat/ubah/hapus proyek sendiri) |
-| Ledger Proyek | ✔ (baca, di detail proyek) | ✔ (baca, di detail proyek) | ✖ | ✔ (CRUD, proyek sendiri) |
+| Ledger Proyek | ✔ (baca, di detail proyek) | ✔ (baca, di detail proyek) | ✔ (baca, di detail proyek yang ia danai) | ✔ (CRUD, proyek sendiri) |
 | Investor / Mutasi Modal / Bagi Hasil / Laporan / Pihak Ketiga | ✔ | ✔ | ✖ | ✖ |
 | Pengguna | ✔ | ✖ | ✖ | ✖ |
 | Ganti Password | ✔ | ✔ | ✔ | ✔ |
@@ -169,7 +170,7 @@ Perbedaan teknis yang disengaja:
 ## 6. Pengujian
 
 ```powershell
-npm test          # 37 uji: 25 logika murni + 12 integrasi PostgreSQL
+npm test          # 38 uji: 25 logika murni + 13 integrasi PostgreSQL
 ```
 
 Uji integrasi otomatis dilewati bila `DATABASE_URL` tidak tersedia, sehingga
