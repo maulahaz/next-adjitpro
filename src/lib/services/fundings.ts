@@ -23,7 +23,7 @@ import {
   thirdParties,
 } from "@/lib/db/schema";
 import { LOSS_RULE, STATUS } from "@/lib/constants";
-import { todayStr, toDateString } from "@/lib/domain/dates";
+import { todayStr, toDateString, addMonths } from "@/lib/domain/dates";
 import { parseMoneyInput, toNum } from "@/lib/domain/money";
 import { AppError } from "@/lib/errors";
 import { logAudit } from "./audit";
@@ -177,6 +177,22 @@ export async function listFundingOptions(
   const all = await listFundings(tx);
   if (!thirdPartyId) return all;
   return all.filter((f) => String(f.pihakKetigaId) === String(thirdPartyId));
+}
+
+/**
+ * Opsi Funding yang **siap dipakai client** pada form proyek:
+ * status `Komplit` DAN aturan bagi hasil (`invest_agreements`) sudah dibuat.
+ * Selama belum memenuhi keduanya, nama Funding tidak ditampilkan ke client.
+ */
+export async function listUsableFundingOptions(
+  thirdPartyId?: string,
+  tx: DbOrTx = db,
+): Promise<FundingDTO[]> {
+  const all = await listFundingOptions(thirdPartyId, tx);
+  if (!all.length) return [];
+  const agrs = await tx.select().from(investAgreements);
+  const withAgreement = new Set(agrs.map((a) => a.fundingId));
+  return all.filter((f) => f.status === STATUS.FUND_KOMPLIT && withAgreement.has(f.id));
 }
 
 export async function getFundingDetail(id: string, tx: DbOrTx = db): Promise<FundingDetailDTO> {
@@ -347,10 +363,8 @@ export async function addContribution(data: ContributionInput, actor: string): P
   await db.insert(fundingContributions).values(payload);
   await logAudit({ aksi: "CREATE", sheet: "FundingContributions", recordId: id, detail: String(jumlah), user: actor });
 
-  // Funding yang sudah mulai dihimpun berstatus Berjalan.
-  if (fRows[0].status === STATUS.FUND_DRAFT) {
-    await db.update(fundings).set({ status: STATUS.FUND_BERJALAN }).where(eq(fundings.id, fundingId));
-  }
+  // Funding otomatis "Komplit" bila dana investor sudah mencukupi target.
+  await recomputeFundingStatus(fundingId);
 
   return {
     id,
@@ -381,6 +395,7 @@ export async function deleteContribution(id: string, actor: string): Promise<boo
 
   await db.delete(fundingContributions).where(eq(fundingContributions.id, id));
   await logAudit({ aksi: "DELETE", sheet: "FundingContributions", recordId: id, user: actor });
+  await recomputeFundingStatus(c.fundingId);
   return true;
 }
 
@@ -392,6 +407,8 @@ export interface AgreementInput {
   profitClient?: number | string;
   lossRule?: string;
   jatuhTempo?: string;
+  /** Jatuh tempo sebagai jumlah bulan setelah jatuh tempo Funding. */
+  jatuhTempoMonths?: number | string;
   principalTerm?: string;
 }
 
@@ -404,14 +421,33 @@ export async function saveAgreement(data: AgreementInput, actor: string): Promis
 
   const pi = clampPct(parseFloatLoose(data.profitInvestor), "Porsi investor");
   const pc = clampPct(parseFloatLoose(data.profitClient), "Porsi client");
+  if (Math.round((pi + pc) * 100) / 100 !== 100) {
+    throw new AppError("Total porsi Investor dan Client harus 100%.");
+  }
   const lossRule = data.lossRule || LOSS_RULE.PROPORSIONAL;
+
+  // Jatuh tempo aturan bagi hasil = N bulan setelah jatuh tempo Funding.
+  const fundingJatuhTempo = toDateString(fRows[0].jatuhTempo);
+  const hasMonths =
+    data.jatuhTempoMonths !== undefined && data.jatuhTempoMonths !== null && data.jatuhTempoMonths !== "";
+  let jatuhTempo: string | null;
+  if (hasMonths) {
+    const months = Math.trunc(parseFloatLoose(data.jatuhTempoMonths));
+    if (months < 0) throw new AppError("Jatuh tempo (bulan) tidak boleh negatif.");
+    if (!fundingJatuhTempo) {
+      throw new AppError("Jatuh tempo Funding belum diisi, tidak bisa menghitung jatuh tempo bagi hasil.");
+    }
+    jatuhTempo = addMonths(fundingJatuhTempo, months) || null;
+  } else {
+    jatuhTempo = toDateString(data.jatuhTempo) || fundingJatuhTempo || null;
+  }
 
   const payload = {
     fundingId,
     profitInvestor: String(pi),
     profitClient: String(pc),
     lossRule,
-    jatuhTempo: toDateString(data.jatuhTempo) || toDateString(fRows[0].jatuhTempo) || null,
+    jatuhTempo,
     principalTerm: data.principalTerm ?? "",
   };
 
@@ -552,6 +588,29 @@ export async function listFundingsForInvestor(investorId: string): Promise<Fundi
 }
 
 /* ============================ INTERNAL ============================ */
+
+/**
+ * Sinkronkan status Draft/Komplit sebuah Funding dengan total kontribusi:
+ * `Komplit` bila total ≥ target (target > 0). Status `Berjalan`/`Lunas`/
+ * `Dibatalkan` tidak diubah otomatis.
+ */
+async function recomputeFundingStatus(fundingId: string): Promise<void> {
+  const fRows = await db.select().from(fundings).where(eq(fundings.id, fundingId)).limit(1);
+  const f = fRows[0];
+  if (!f) return;
+  if (f.status !== STATUS.FUND_DRAFT && f.status !== STATUS.FUND_KOMPLIT) return;
+
+  const contribs = await db
+    .select()
+    .from(fundingContributions)
+    .where(eq(fundingContributions.fundingId, fundingId));
+  const total = contribs.reduce((s, c) => s + toNum(c.jumlah), 0);
+  const target = toNum(f.targetModal);
+  const next = target > 0 && total >= target ? STATUS.FUND_KOMPLIT : STATUS.FUND_DRAFT;
+  if (f.status !== next) {
+    await db.update(fundings).set({ status: next }).where(eq(fundings.id, fundingId));
+  }
+}
 
 function clampPct(v: number, label: string): number {
   if (Number.isNaN(v)) return 0;

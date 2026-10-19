@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowLeft, CheckCircle2, ExternalLink, PieChart, Plus, Trash2 } from "lucide-react";
+import { ArrowLeft, CheckCircle2, ExternalLink, PieChart, Plus, RotateCcw, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -13,6 +13,7 @@ import { TableCell, TableHead, TableRow } from "@/components/ui/table";
 import {
   addProjectTransactionAction,
   deleteProjectTransactionAction,
+  reopenProjectAction,
 } from "@/app/actions/projects";
 import { closeProjectAction, distributeProfitAction } from "@/app/actions/finance";
 import { formatRupiah, formatPorsi } from "@/lib/domain/money";
@@ -68,7 +69,27 @@ export function ProjectDetailClient({
           ) : null}
         </div>
 
-        {!locked && canWrite ? (
+        {locked && canWrite ? (
+          <div className="flex flex-wrap gap-2">
+            <FormDialog
+              trigger={
+                <Button variant="outline">
+                  <RotateCcw className="h-4 w-4" /> Buka Kembali
+                </Button>
+              }
+              title="Buka Kembali Proyek"
+              description="Proyek dibuka kembali (khusus Admin) agar kesalahan input bisa diperbaiki. Setelah selesai, tutup kembali proyek."
+              action={reopenProjectAction}
+              submitLabel="Buka Kembali"
+            >
+              <input type="hidden" name="id" value={project.id} />
+              <p className="text-sm text-muted-foreground">
+                Status dikembalikan otomatis: Selesai (sudah dibagikan), Berjalan (sudah ada entri
+                Ledger), atau Draft.
+              </p>
+            </FormDialog>
+          </div>
+        ) : !locked && canWrite ? (
           <div className="flex flex-wrap gap-2">
             <FormDialog
               trigger={

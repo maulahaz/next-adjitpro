@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { DollarSign, Eye, Pencil, Plus, Trash2 } from "lucide-react";
+import { DollarSign, Pencil, Plus, RotateCcw, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -11,7 +11,7 @@ import { DataTable } from "@/components/app/data-table";
 import { StatusPill } from "@/components/app/ui-helpers";
 import { Badge } from "@/components/ui/badge";
 import { TableCell, TableHead, TableRow } from "@/components/ui/table";
-import { saveProjectAction, deleteProjectAction } from "@/app/actions/projects";
+import { saveProjectAction, deleteProjectAction, reopenProjectAction } from "@/app/actions/projects";
 import { formatRupiah } from "@/lib/domain/money";
 import { displayDate, todayStr } from "@/lib/domain/dates";
 import type { ProjectEnrichedDTO } from "@/lib/services/projects";
@@ -102,34 +102,50 @@ export function ProjectsClient({
                 </Link>
               </Button>
               {canWrite ? (
-                <>
+                p.status === "Ditutup" ? (
                   <FormDialog
                     trigger={
-                      <Button variant="ghost" size="icon" aria-label="Ubah">
-                        <Pencil className="h-4 w-4" />
+                      <Button variant="outline" size="sm" title="Buka kembali proyek">
+                        <RotateCcw className="h-4 w-4" /> Buka
                       </Button>
                     }
-                    title="Ubah Proyek"
-                    action={saveProjectAction}
+                    title="Buka Kembali Proyek"
+                    description={`Buka kembali proyek ${p.nama} agar bisa dikoreksi? Status dikembalikan sesuai riwayatnya (Selesai/Berjalan/Draft).`}
+                    action={reopenProjectAction}
+                    submitLabel="Buka Kembali"
                   >
-                    <ProjectFields
-                      project={p}
-                      thirdParties={thirdParties}
-                      fundingOptions={fundingOptions}
-                    />
+                    <input type="hidden" name="id" value={p.id} />
                   </FormDialog>
-                  <ConfirmDialog
-                    trigger={
-                      <Button variant="ghost" size="icon" aria-label="Hapus" className="text-destructive">
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    }
-                    title="Hapus Proyek"
-                    description={`Hapus proyek ${p.nama}? Hanya proyek Draft tanpa riwayat keuangan yang bisa dihapus.`}
-                    action={deleteProjectAction}
-                    hidden={{ id: p.id }}
-                  />
-                </>
+                ) : (
+                  <>
+                    <FormDialog
+                      trigger={
+                        <Button variant="ghost" size="icon" aria-label="Ubah">
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                      }
+                      title="Ubah Proyek"
+                      action={saveProjectAction}
+                    >
+                      <ProjectFields
+                        project={p}
+                        thirdParties={thirdParties}
+                        fundingOptions={fundingOptions}
+                      />
+                    </FormDialog>
+                    <ConfirmDialog
+                      trigger={
+                        <Button variant="ghost" size="icon" aria-label="Hapus" className="text-destructive">
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      }
+                      title="Hapus Proyek"
+                      description={`Hapus proyek ${p.nama}? Hanya proyek Draft tanpa riwayat keuangan yang bisa dihapus.`}
+                      action={deleteProjectAction}
+                      hidden={{ id: p.id }}
+                    />
+                  </>
+                )
               ) : null}
             </div>
           </TableCell>
@@ -173,14 +189,20 @@ function ProjectFields({
           options={thirdParties.map((t) => ({ value: t.id, label: t.nama }))}
         />
       </Field>
-      <Field label="Alokasi Budget (Rp)" htmlFor="prj-alokasi" hint="Estimasi alokasi budget dari funding untuk proyek ini.">
+      <Field
+        label="Alokasi Budget (Rp)"
+        htmlFor="prj-alokasi"
+        hint="Estimasi alokasi budget dari funding untuk proyek ini. Wajib diisi."
+        required
+      >
         <Input
           id="prj-alokasi"
           name="alokasiBudget"
           type="number"
-          min={0}
+          min={1}
           step={1}
           placeholder="0"
+          required
           defaultValue={project?.alokasiBudget ? String(project.alokasiBudget) : ""}
         />
       </Field>

@@ -22,12 +22,14 @@ import {
   addProjectTransaction,
   listProjectsEnriched,
   deleteProject,
+  reopenProject,
   investorFundsProject,
 } from "@/lib/services/projects";
 import {
   addFundingReturn,
   addContribution,
   getFundingDetail,
+  listUsableFundingOptions,
   saveAgreement,
   saveFunding,
 } from "@/lib/services/fundings";
@@ -48,11 +50,23 @@ const TRUNCATE = `TRUNCATE TABLE audit_log, sessions, login_attempts, profit_dis
   third_parties, investors, users, counters RESTART IDENTITY CASCADE`;
 
 /** Buat Funding sederhana untuk sebuah pihak ketiga (pembantu uji). */
-async function makeFunding(thirdPartyId: string, nama = "Funding Uji", targetModal = 0) {
+async function makeFunding(
+  thirdPartyId: string,
+  nama = "Funding Uji",
+  targetModal = 0,
+  status = "Draft",
+) {
   return saveFunding(
-    { pihakKetigaId: thirdPartyId, nama, targetModal, jatuhTempo: "2026-12-31" },
+    { pihakKetigaId: thirdPartyId, nama, targetModal, jatuhTempo: "2026-12-31", status },
     "test",
   );
+}
+
+/** Funding siap dipakai client: status Komplit + aturan bagi hasil 70/30. */
+async function makeUsableFunding(thirdPartyId: string, nama = "Funding Siap") {
+  const f = await makeFunding(thirdPartyId, nama, 0, "Komplit");
+  await saveAgreement({ fundingId: f.id, profitInvestor: 70, profitClient: 30 }, "test");
+  return f;
 }
 
 describe.skipIf(!hasDb)("integrasi: alur keuangan lengkap", () => {
@@ -77,6 +91,9 @@ describe.skipIf(!hasDb)("integrasi: alur keuangan lengkap", () => {
     await addContribution({ fundingId: funding.id, investorId: B.id, jumlah: 150000000 }, "test");
     await addContribution({ fundingId: funding.id, investorId: C.id, jumlah: 225000000 }, "test");
 
+    // Total kontribusi mencapai target -> Funding otomatis berstatus Komplit.
+    expect((await getFundingDetail(funding.id)).funding.status).toBe("Komplit");
+
     // Seluruh laba menjadi hak investor (porsi 100/0).
     await saveAgreement(
       { fundingId: funding.id, profitInvestor: 100, profitClient: 0, lossRule: "Proporsional" },
@@ -88,12 +105,15 @@ describe.skipIf(!hasDb)("integrasi: alur keuangan lengkap", () => {
       "test",
     );
 
-    // Proyek dengan alokasi budget dari funding langsung berstatus Berjalan.
+    // Proyek baru selalu Draft (menjadi Berjalan lewat entri Ledger).
     let list = await listProjectsEnriched();
     const p0 = list.find((p) => p.id === project.id)!;
-    expect(p0.status).toBe("Berjalan");
+    expect(p0.status).toBe("Draft");
     expect(p0.modal).toBe(600000000);
     expect(p0.jumlahInvestor).toBe(3);
+
+    // Dana Funding dipakai proyek -> Funding berstatus Berjalan.
+    expect((await getFundingDetail(funding.id)).funding.status).toBe("Berjalan");
 
     await addProjectTransaction(
       { projectId: project.id, tipe: "Pendapatan", jumlah: 95000000 },
@@ -317,45 +337,73 @@ describe.skipIf(!hasDb)("integrasi: proyek — scoping client & aturan hapus", (
   it("client membuat/mengubah/menghapus hanya proyek pihak ketiganya", async () => {
     const tp = await saveThirdParty({ nama: "PT Klien" }, "test");
     const otherTp = await saveThirdParty({ nama: "PT Lain" }, "test");
-    const fundingTp = await makeFunding(tp.id, "Funding Klien");
-    const fundingOther = await makeFunding(otherTp.id, "Funding Lain");
+    const fundingTp = await makeUsableFunding(tp.id, "Funding Klien");
+    const fundingOther = await makeFunding(otherTp.id, "Funding Lain", 0, "Komplit");
+    // Komplit tetapi BELUM memiliki aturan bagi hasil -> belum boleh dipakai client.
+    const fundingNoAgr = await makeFunding(tp.id, "Funding Tanpa Aturan", 0, "Komplit");
+    // Masih Draft -> belum boleh dipakai client.
+    const fundingDraftFund = await makeFunding(tp.id, "Funding Draft", 0, "Draft");
+
+    // Alokasi budget wajib diisi (dicek sebelum proyek dibuat / Funding berjalan).
+    await expect(
+      saveProject({ nama: "X", fundingId: fundingTp.id }, "client1", { scopeThirdPartyId: tp.id }),
+    ).rejects.toThrow(/Alokasi budget wajib/);
 
     // CREATE: pihak ketiga dipaksa dari scope, bukan dari input form.
     const created = await saveProject(
-      { nama: "Proyek Klien", fundingId: fundingTp.id },
+      { nama: "Proyek Klien", fundingId: fundingTp.id, alokasiBudget: 1000000 },
       "client1",
       { scopeThirdPartyId: tp.id },
     );
     expect(created.pihakKetigaId).toBe(tp.id);
     expect(created.status).toBe("Draft");
     expect(created.fundingId).toBe(fundingTp.id);
+    // Funding dipakai proyek -> berstatus Berjalan.
+    expect((await getFundingDetail(fundingTp.id)).funding.status).toBe("Berjalan");
 
-    // Client tidak boleh memakai funding milik pihak ketiga lain.
-    await expect(
-      saveProject({ nama: "Proyek X", fundingId: fundingOther.id }, "client1", {
-        scopeThirdPartyId: tp.id,
-      }),
-    ).rejects.toThrow(/hak akses/);
-
-    // UPDATE milik sendiri tetap pada pihak ketiganya.
+    // UPDATE proyek sendiri tetap boleh walau Funding sudah Berjalan (tetap sama).
     const updated = await saveProject(
-      { id: created.id, nama: "Proyek Klien 2", fundingId: fundingTp.id },
+      { id: created.id, nama: "Proyek Klien 2", fundingId: fundingTp.id, alokasiBudget: 1000000 },
       "client1",
       { scopeThirdPartyId: tp.id },
     );
     expect(updated.nama).toBe("Proyek Klien 2");
     expect(updated.pihakKetigaId).toBe(tp.id);
 
+    // Gating saat MEMILIH Funding baru: Draft ditolak, Komplit tanpa aturan ditolak.
+    await expect(
+      saveProject({ nama: "X", fundingId: fundingDraftFund.id, alokasiBudget: 1000000 }, "client1", {
+        scopeThirdPartyId: tp.id,
+      }),
+    ).rejects.toThrow(/harus Komplit/);
+    await expect(
+      saveProject({ nama: "X", fundingId: fundingNoAgr.id, alokasiBudget: 1000000 }, "client1", {
+        scopeThirdPartyId: tp.id,
+      }),
+    ).rejects.toThrow(/aturan bagi hasil/);
+
+    // Client tidak boleh memakai funding milik pihak ketiga lain.
+    await expect(
+      saveProject(
+        { nama: "Proyek X", fundingId: fundingOther.id, alokasiBudget: 1000000 },
+        "client1",
+        { scopeThirdPartyId: tp.id },
+      ),
+    ).rejects.toThrow(/hak akses/);
+
+    // Proyek pihak ketiga lain dibuat oleh admin (tanpa scope client).
     const other = await saveProject(
-      { nama: "Proyek Lain", fundingId: fundingOther.id, pihakKetigaId: otherTp.id },
+      { nama: "Proyek Lain", fundingId: fundingOther.id, pihakKetigaId: otherTp.id, alokasiBudget: 1000000 },
       "test",
     );
 
     // UPDATE & DELETE proyek pihak ketiga lain DITOLAK.
     await expect(
-      saveProject({ id: other.id, nama: "diretas", fundingId: fundingOther.id }, "client1", {
-        scopeThirdPartyId: tp.id,
-      }),
+      saveProject(
+        { id: other.id, nama: "diretas", fundingId: fundingOther.id, alokasiBudget: 1000000 },
+        "client1",
+        { scopeThirdPartyId: tp.id },
+      ),
     ).rejects.toThrow(/hak akses/);
     await expect(
       deleteProject(other.id, "client1", { scopeThirdPartyId: tp.id }),
@@ -371,16 +419,26 @@ describe.skipIf(!hasDb)("integrasi: proyek — scoping client & aturan hapus", (
     const tp = await saveThirdParty({ nama: "PT Audit" }, "test");
     const funding = await makeFunding(tp.id, "Funding Audit");
 
-    // Berjalan (ada alokasi budget) -> tidak bisa dihapus.
+    // Berjalan (sudah ada entri Ledger) -> tidak bisa dihapus.
     const running = await saveProject(
       { nama: "Proyek Berjalan", fundingId: funding.id, alokasiBudget: 5000000 },
       "test",
     );
-    expect(running.status).toBe("Berjalan");
+    expect(running.status).toBe("Draft");
+    await saveProjectLedger(
+      { projectId: running.id, jenis: "Debet", nominal: 1000000 },
+      "test",
+      { thirdPartyId: tp.id },
+    );
+    let list = await listProjectsEnriched();
+    expect(list.find((p) => p.id === running.id)!.status).toBe("Berjalan");
     await expect(deleteProject(running.id, "test")).rejects.toThrow(/tidak bisa dihapus/);
 
     // Draft dengan transaksi -> tidak bisa dihapus.
-    const draft = await saveProject({ nama: "Proyek Draft", fundingId: funding.id }, "test");
+    const draft = await saveProject(
+      { nama: "Proyek Draft", fundingId: funding.id, alokasiBudget: 1000000 },
+      "test",
+    );
     expect(draft.status).toBe("Draft");
     await addProjectTransaction({ projectId: draft.id, tipe: "Pendapatan", jumlah: 1000000 }, "test");
     await expect(deleteProject(draft.id, "test")).rejects.toThrow(/riwayat keuangan/);
@@ -399,11 +457,11 @@ describe.skipIf(!hasDb)("integrasi: ledger proyek (client)", () => {
     const fundingTp = await makeFunding(tp.id, "Funding Ledger");
     const fundingOther = await makeFunding(otherTp.id, "Funding Lain");
     const project = await saveProject(
-      { nama: "Proyek Ledger", fundingId: fundingTp.id, pihakKetigaId: tp.id },
+      { nama: "Proyek Ledger", fundingId: fundingTp.id, pihakKetigaId: tp.id, alokasiBudget: 5000000 },
       "test",
     );
     const otherProject = await saveProject(
-      { nama: "Proyek Lain", fundingId: fundingOther.id, pihakKetigaId: otherTp.id },
+      { nama: "Proyek Lain", fundingId: fundingOther.id, pihakKetigaId: otherTp.id, alokasiBudget: 5000000 },
       "test",
     );
 
@@ -428,6 +486,11 @@ describe.skipIf(!hasDb)("integrasi: ledger proyek (client)", () => {
     let rows = await listProjectLedgers(project.id);
     expect(rows).toHaveLength(1);
     expect(rows[0]!.deskripsi).toBe("Item-1");
+
+    // Entri pertama membuat proyek Draft berubah menjadi Berjalan.
+    expect(
+      (await listProjectsEnriched()).find((p) => p.id === project.id)!.status,
+    ).toBe("Berjalan");
 
     // UPDATE (jenis, nominal & deskripsi)
     const updated = await saveProjectLedger(
@@ -480,10 +543,99 @@ describe.skipIf(!hasDb)("integrasi: ledger proyek (client)", () => {
       deleteProjectLedger(otherEntry.id, "client1", { thirdPartyId: tp.id }),
     ).rejects.toThrow(/hak akses/);
   });
+
+  it("proyek Ditutup mengunci Ledger; Admin bisa membuka kembali", async () => {
+    const tp = await saveThirdParty({ nama: "PT Lock" }, "test");
+    const funding = await makeFunding(tp.id, "Funding Lock");
+    const project = await saveProject(
+      { nama: "Proyek Lock", fundingId: funding.id, pihakKetigaId: tp.id, alokasiBudget: 1000000 },
+      "test",
+    );
+    const entry = await saveProjectLedger(
+      { projectId: project.id, jenis: "Debet", nominal: 1000000 },
+      "client1",
+      { thirdPartyId: tp.id },
+    );
+
+    // Laba 0 -> proyek bisa ditutup tanpa bagi hasil.
+    await closeProject(project.id, "test");
+
+    // Setelah ditutup: tambah/ubah/hapus Ledger ditolak.
+    await expect(
+      saveProjectLedger(
+        { projectId: project.id, jenis: "Debet", nominal: 1000 },
+        "client1",
+        { thirdPartyId: tp.id },
+      ),
+    ).rejects.toThrow(/ditutup/);
+    await expect(
+      saveProjectLedger(
+        { id: entry.id, projectId: project.id, jenis: "Debet", nominal: 2000 },
+        "client1",
+        { thirdPartyId: tp.id },
+      ),
+    ).rejects.toThrow(/ditutup/);
+    await expect(
+      deleteProjectLedger(entry.id, "client1", { thirdPartyId: tp.id }),
+    ).rejects.toThrow(/ditutup/);
+
+    // Admin membuka kembali -> status Berjalan (karena sudah ada Ledger) & bisa diubah.
+    const reopened = await reopenProject(project.id, "admin");
+    expect(reopened.status).toBe("Berjalan");
+    await expect(
+      saveProjectLedger(
+        { projectId: project.id, jenis: "Debet", nominal: 3000 },
+        "client1",
+        { thirdPartyId: tp.id },
+      ),
+    ).resolves.toBeTruthy();
+  });
 });
 
-describe.skipIf(!hasDb)("integrasi: autentikasi", () => {
+describe.skipIf(!hasDb)("integrasi: aturan bagi hasil & kesiapan Funding", () => {
   beforeAll(async () => {
+    await getSql().unsafe(TRUNCATE);
+    await ensureDefaultAdmin();
+  });
+
+  it("porsi investor + client harus tepat 100%", async () => {
+    const tp = await saveThirdParty({ nama: "PT Agr" }, "test");
+    const funding = await makeFunding(tp.id, "Funding Agr", 0, "Komplit");
+
+    await expect(
+      saveAgreement({ fundingId: funding.id, profitInvestor: 70, profitClient: 40 }, "test"),
+    ).rejects.toThrow(/harus 100%/);
+    await expect(
+      saveAgreement({ fundingId: funding.id, profitInvestor: 70, profitClient: 30 }, "test"),
+    ).resolves.toBeTruthy();
+  });
+
+  it("jatuh tempo bagi hasil = N bulan setelah jatuh tempo Funding", async () => {
+    const tp = await saveThirdParty({ nama: "PT Jt" }, "test");
+    const funding = await makeFunding(tp.id, "Funding Jt", 0, "Komplit");
+    // makeFunding memakai jatuh tempo 2026-12-31.
+    const agr = await saveAgreement(
+      { fundingId: funding.id, profitInvestor: 60, profitClient: 40, jatuhTempoMonths: 3 },
+      "test",
+    );
+    expect(agr.jatuhTempo).toBe("2027-03-31");
+  });
+
+  it("opsi Funding siap pakai = Komplit + sudah ada aturan bagi hasil", async () => {
+    const tp = await saveThirdParty({ nama: "PT Opsi" }, "test");
+    const draftFund = await makeFunding(tp.id, "F Draft", 0, "Draft");
+    const komplitNoAgr = await makeFunding(tp.id, "F Komplit Tanpa Aturan", 0, "Komplit");
+    const usable = await makeFunding(tp.id, "F Siap", 0, "Komplit");
+    await saveAgreement({ fundingId: usable.id, profitInvestor: 50, profitClient: 50 }, "test");
+
+    const ids = (await listUsableFundingOptions(tp.id)).map((o) => o.id);
+    expect(ids).toContain(usable.id);
+    expect(ids).not.toContain(draftFund.id);
+    expect(ids).not.toContain(komplitNoAgr.id);
+  });
+});
+
+describe.skipIf(!hasDb)("integrasi: autentikasi", () => {  beforeAll(async () => {
     await getSql().unsafe(TRUNCATE);
     await ensureDefaultAdmin();
   });

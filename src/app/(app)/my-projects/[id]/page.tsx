@@ -46,7 +46,11 @@ export default async function MyProjectLedgerPage({
         <StatusPill status={project.status} />
       </PageHeader>
 
-      <ProjectLedgerClient projectId={project.id} ledgers={ledgers} />
+      <ProjectLedgerClient
+        projectId={project.id}
+        ledgers={ledgers}
+        readOnly={project.status === "Ditutup"}
+      />
     </div>
   );
 }

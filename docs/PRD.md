@@ -124,7 +124,7 @@ Lihat §2.2 dan §15.
 | BR-6 | **Uang dalam Rupiah bilangan bulat** — tanpa desimal. Porsi disimpan dengan presisi `numeric(9,4)` (persentase agreement `numeric(5,2)`). |
 | BR-7 | **Penarikan modal** tidak boleh melebihi **saldo idle** investor. |
 | BR-8 | **Kontribusi investor ke Funding** tidak boleh melebihi **saldo idle** investor. |
-| BR-9 | Proyek berstatus **`Ditutup` bersifat final** — tidak dapat diubah atau ditambah transaksi. |
+| BR-9 | Proyek berstatus **`Ditutup` bersifat final** — tidak dapat diubah, tidak dapat ditambah transaksi, dan **Ledger-nya terkunci**. Admin dapat **membuka kembali** proyek untuk koreksi (status dipulihkan sesuai riwayat). |
 | BR-10 | Proyek berlaba **wajib dibagikan lebih dulu** sebelum dapat ditutup. |
 | BR-11 | Bagi hasil **hanya boleh sekali** per proyek. |
 | BR-12 | Bagi hasil hanya boleh dijalankan bila **alokasi budget proyek > 0**, **laba ≠ 0**, dan Funding sudah punya **kontribusi**. |
@@ -137,6 +137,8 @@ Lihat §2.2 dan §15.
 | BR-19 | Zona waktu aplikasi **`Asia/Jakarta`**; tanggal `yyyy-MM-dd`, waktu `yyyy-MM-dd HH:mm:ss`. |
 | BR-20 | Setiap **proyek wajib** memiliki `funding_id`; satu Funding dimiliki **satu client** dan dapat membiayai **beberapa proyek**. Funding tidak bisa dihapus bila sudah dipakai proyek atau punya kontribusi. |
 | BR-21 | **Penutupan proyek** (admin/operator/client) menandai `Ditutup` + tanggal selesai aktual, dan mengirim **notifikasi email** ke investor pendana Funding proyek tersebut (mode default `log`). |
+| BR-22 | **Siklus Funding**: `Draft` → `Komplit` (total kontribusi mencapai target, atau ditetapkan admin/operator) → `Berjalan` (dana dipakai proyek) → `Lunas` (pokok dikembalikan). Client **hanya boleh memilih Funding `Komplit` yang sudah punya aturan bagi hasil**; jumlah porsi investor + client wajib **tepat 100%**. |
+| BR-23 | **Siklus proyek**: proyek baru berstatus `Draft` dan menjadi `Berjalan` saat **entri Ledger pertama** ditambahkan; `Selesai` setelah bagi hasil; `Ditutup` setelah penutupan. |
 
 ### 5.1 Algoritma pembagian laba (acuan contoh)
 
@@ -238,7 +240,7 @@ Kode persyaratan dipakai sebagai rujukan uji & pelacakan.
 | FR-USER-02 | Tambah / ubah pengguna: username, nama, peran, status, tautan investor/pihak ketiga. | Wajib |
 | FR-USER-03 | Peran `investor` **wajib** ditautkan ke data investor yang ada. | Wajib |
 | FR-USER-04 | Peran `client` **wajib** ditautkan ke data pihak ketiga yang ada. | Wajib |
-| FR-USER-05 | Admin dapat **reset password** pengguna lain tanpa mengetahui password lama. | Wajib |
+| FR-USER-05 | Admin dapat **reset password** pengguna lain tanpa mengetahui password lama; password direset ke nilai standar **`pass-123`**. | Wajib |
 | FR-USER-06 | Admin dapat mengaktifkan/menonaktifkan pengguna. | Wajib |
 | FR-USER-07 | Admin **tidak dapat menghapus akun yang sedang dipakai**. | Wajib |
 | FR-USER-08 | Admin **tidak dapat menghapus admin terakhir**. | Wajib |
@@ -252,6 +254,8 @@ Kode persyaratan dipakai sebagai rujukan uji & pelacakan.
 | FR-DASH-02 | Posisi tiap investor (modal pokok, terpakai, idle, laba, ekuitas). | Wajib |
 | FR-DASH-03 | Daftar proyek beserta ringkasan modal & labanya. | Wajib |
 | FR-DASH-04 | Bagi peran `investor`, seluruh angka **hanya** mencakup data dirinya. | Wajib |
+| FR-DASH-05 | Menampilkan **Total Profit proyek berstatus `Ditutup`** — admin/operator: total seluruh proyek; investor: laba miliknya dari proyek `Ditutup`. | Wajib |
+| FR-DASH-06 | Admin/operator melihat **daftar Funding** (dana terhimpun, target, jatuh tempo, status). | Wajib |
 
 ### 7.5 Investor (`FR-INV`)
 
@@ -278,14 +282,16 @@ Kode persyaratan dipakai sebagai rujukan uji & pelacakan.
 | FR-PRJ-02 | Status proyek: `Draft` → `Berjalan` → `Selesai` → `Ditutup`. | Wajib |
 | FR-PRJ-03 | Detail proyek: penempatan modal, transaksi, hasil bagi hasil, ringkasan laba. | Wajib |
 | FR-PRJ-04 | Penambahan penempatan modal divalidasi terhadap saldo idle investor. | Wajib |
-| FR-PRJ-05 | Penempatan pertama pada proyek `Draft` **otomatis** mengubah status menjadi `Berjalan`. | Wajib |
+| FR-PRJ-05 | **Alokasi budget wajib diisi**; proyek baru selalu berstatus `Draft` dan menjadi `Berjalan` saat **entri Ledger pertama** ditambahkan. | Wajib |
 | FR-PRJ-06 | Penempatan modal dapat dihapus (ditolak bila proyek sudah dibagikan/ditutup). | Wajib |
 | FR-PRJ-07 | Transaksi proyek **Pendapatan**/**Biaya** dapat ditambah & dihapus. | Wajib |
-| FR-PRJ-08 | Penghapusan proyek ikut menghapus penempatan & transaksinya, tetapi **ditolak** bila sudah dibagikan. | Wajib |
-| FR-PRJ-09 | Proyek `Ditutup` tidak dapat diubah. | Wajib |
+| FR-PRJ-08 | **Penghapusan proyek** hanya boleh untuk proyek `Draft` **tanpa riwayat keuangan** (transaksi/ledger/bagi hasil) — menjaga jejak audit. | Wajib |
+| FR-PRJ-09 | Proyek `Ditutup` tidak dapat diubah dan **Ledger-nya terkunci (read-only)**. | Wajib |
 | FR-PRJ-10 | Buat/ubah/hapus proyek diizinkan untuk peran **`admin`** (semua proyek) dan **`client`** (hanya proyek miliknya); **operator & investor read-only**. | Wajib |
 | FR-PRJ-11 | Client membuat proyek dari menu **Proyek Saya**; `pihakKetigaId` **terisi otomatis** dari akun client dan modal **tanpa dropdown Pihak Ketiga**. Ubah/hapus hanya untuk proyek miliknya. | Wajib |
 | FR-PRJ-12 | Di menu **Proyek** (internal), tombol buat/ubah/hapus hanya tampil untuk admin; operator hanya melihat daftar. | Wajib |
+| FR-PRJ-13 | **Admin** dapat **membuka kembali** proyek `Ditutup` untuk koreksi kesalahan input; status dikembalikan ke `Selesai`/`Berjalan`/`Draft` sesuai riwayat dan `tanggal_selesai_aktual` dikosongkan. | Wajib |
+| FR-PRJ-14 | Dashboard menampilkan **Total Profit proyek berstatus `Ditutup`** — admin/operator: seluruh proyek; investor: bagian laba miliknya. | Wajib |
 
 ### 7.8 Bagi hasil (`FR-DIST`)
 
@@ -404,16 +410,19 @@ Kode persyaratan dipakai sebagai rujukan uji & pelacakan.
 
 | ID | Kebutuhan | Prioritas |
 | --- | --- | --- |
-| FR-FUND-01 | Entitas **Funding**: `nama`, `target_modal`, `tanggal_mulai`, `jatuh_tempo`, `status` (`Draft`/`Berjalan`/`Lunas`/`Dibatalkan`), `catatan`, `pihak_ketiga_id` (satu client). Dikelola admin/operator. | Wajib |
+| FR-FUND-01 | Entitas **Funding**: `nama`, `target_modal`, `tanggal_mulai`, `jatuh_tempo`, `status` (`Draft`/`Komplit`/`Berjalan`/`Lunas`/`Dibatalkan`), `catatan`, `pihak_ketiga_id` (satu client). Dikelola admin/operator. | Wajib |
 | FR-FUND-02 | **Kontribusi Funding**: penempatan modal investor ke Funding (`jumlah`, `tanggal`, `status` `Aktif`/`Dikembalikan`/`Dibatalkan`, `catatan`). Tidak boleh melebihi saldo idle; mengunci idle (terpakai). | Wajib |
-| FR-FUND-03 | **Aturan bagi hasil** (`invest_agreements`, 1 Funding : 1): `profit_investor`/`profit_client` (persen), `loss_rule` (`Proporsional`/`Investor`/`Client`), `jatuh_tempo`, `principal_term`. | Wajib |
+| FR-FUND-03 | **Aturan bagi hasil** (`invest_agreements`, 1 Funding : 1): `profit_investor`/`profit_client` (persen — **totalnya wajib tepat 100%**), `loss_rule` (`Proporsional`/`Investor`/`Client`), `jatuh_tempo` (**N bulan setelah jatuh tempo Funding**), `principal_term`. | Wajib |
 | FR-FUND-04 | **Pengembalian pokok** (`funding_returns`) dicatat admin/operator; bila total menutup seluruh kontribusi, kontribusi menjadi `Dikembalikan`, Funding menjadi `Lunas`, dan idle investor dilepas. | Wajib |
-| FR-FUND-05 | **Proyek wajib** memilih Funding (`funding_id` NOT NULL) dan dapat mengisi `alokasi_budget` (modal proyek). Funding harus milik pihak ketiga client yang sama. | Wajib |
+| FR-FUND-05 | **Proyek wajib** memilih Funding (`funding_id` NOT NULL) dan **wajib mengisi `alokasi_budget`** (modal proyek). Funding harus milik pihak ketiga client yang sama. | Wajib |
 | FR-FUND-06 | **Bagi hasil proyek**: laba dipecah sesuai persen agreement (investor vs client); bagian investor dibagi pro-rata ke kontributor Funding (largest remainder); rugi mengikuti `loss_rule`. | Wajib |
 | FR-FUND-07 | **Penutupan proyek** oleh admin/operator/client menandai `Ditutup` dan mengirim **notifikasi email** ke investor pendana (abstraksi `EMAIL_MODE`, default `log`). | Wajib |
 | FR-FUND-08 | **Aturan hapus proyek**: hanya proyek `Draft` tanpa riwayat keuangan (transaksi/ledger/bagi hasil) yang bisa dihapus — menjaga jejak audit. | Wajib |
 | FR-FUND-09 | **Ringkasan Funding** untuk investor: daftar Funding yang ia ikuti beserta kontribusi, laba, jumlah proyek, dan jatuh tempo — tampil di **Laporan** dan **Kartu Saya**. | Wajib |
 | FR-FUND-10 | Investor dapat membuka **detail proyek** yang Funding-nya ia danai (read-only) — lewat kontribusi Funding, bukan penempatan langsung. | Wajib |
+| FR-FUND-11 | Funding otomatis menjadi **`Komplit`** saat total kontribusi mencapai target; saat dananya dipakai proyek menjadi **`Berjalan`**. **Client hanya boleh memilih Funding berstatus `Komplit` yang sudah memiliki aturan bagi hasil** (Funding yang sudah dipakai proyek tetap boleh dipertahankan saat mengubah proyek). | Wajib |
+| FR-FUND-12 | Kolom Funding pada **Proyek Saya** menampilkan **nama Funding + total dana terhimpun** `nama (Total: Rp…)`. | Wajib |
+| FR-FUND-13 | Dashboard admin/operator menampilkan **daftar Funding** (dana terhimpun, target, jatuh tempo, status). | Wajib |
 
 ---
 
@@ -633,11 +642,15 @@ Rilis dinyatakan memenuhi syarat bila seluruh poin berikut terbukti.
 - [ ] Investor hanya menerima data miliknya; **detail proyek** hanya dapat dibuka untuk proyek yang **ia danai** (read-only, tanpa aksi tulis), proyek lain 404.
 - [ ] Client hanya menerima nama/periode/status proyeknya (tanpa data keuangan internal) dan entri Ledger Proyek miliknya.
 - [ ] Client hanya dapat menulis pada **proyek miliknya** dan **Ledger Proyek** miliknya; investor & operator tidak dapat menambah/mengubah/menghapus proyek (ditolak di server).
-- [ ] Client membuat proyek → tertaut otomatis ke pihak ketiganya dan **wajib memilih Funding miliknya**.
+- [ ] Client membuat proyek → tertaut otomatis ke pihak ketiganya, **wajib mengisi Alokasi Budget**, dan hanya boleh memilih **Funding `Komplit` yang sudah punya aturan bagi hasil**.
+- [ ] Proyek baru berstatus `Draft` → menjadi `Berjalan` saat **entri Ledger pertama** ditambahkan.
 - [ ] Operator mencatat **kontribusi Funding** → saldo idle investor berkurang (terpakai); pengembalian pokok melepas idle dan Funding menjadi `Lunas`.
-- [ ] Bagi hasil proyek memakai persen `invest_agreements`; total bagian investor tepat sama dengan laba (largest remainder).
+- [ ] Bagi hasil proyek memakai persen `invest_agreements` (total wajib **100%**); total bagian investor tepat sama dengan laba (largest remainder).
 - [ ] **Penutupan proyek** menandai `Ditutup` dan memicu notifikasi email (mode `log`) ke investor pendana.
 - [ ] Proyek `Berjalan` atau yang punya riwayat keuangan **tidak dapat dihapus**.
+- [ ] Proyek `Ditutup` **mengunci Ledger**; **Admin** dapat membuka kembali proyek untuk koreksi.
+- [ ] Dashboard menampilkan **Total Profit proyek `Ditutup`** (investor: bagian miliknya) dan daftar **Funding** (admin/operator).
+- [ ] Admin **reset password** pengguna ke **`pass-123`**.
 - [ ] Ekspor CSV tanpa sesi sah **ditolak (401)**.
 - [ ] Terkunci setelah 5 percobaan gagal; akun nonaktif ditolak.
 - [ ] Login memakai hash lama SHA-256 berhasil dan otomatis di-*upgrade* ke bcrypt.

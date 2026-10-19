@@ -7,6 +7,7 @@ import {
   addProjectTransaction,
   deleteProject,
   deleteProjectTransaction,
+  reopenProject,
   saveProject,
 } from "@/lib/services/projects";
 import { errorState, num, ok, str } from "@/lib/actions-util";
@@ -109,6 +110,22 @@ export async function deleteProjectTransactionAction(
     await deleteProjectTransaction(str(formData, "id"), session.username);
     revalidate(str(formData, "projectId"));
     return ok("Transaksi dihapus.");
+  } catch (err) {
+    return errorState(err);
+  }
+}
+
+/**
+ * Buka kembali proyek yang sudah ditutup — **khusus admin**, untuk koreksi
+ * kesalahan input. Status proyek dikembalikan (Selesai/Berjalan/Draft).
+ */
+export async function reopenProjectAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  try {
+    const session = await requireRoles([ROLES.ADMIN]);
+    const id = str(formData, "id");
+    await reopenProject(id, session.username);
+    revalidate(id);
+    return ok("Proyek dibuka kembali. Silakan lakukan koreksi lalu tutup lagi bila selesai.");
   } catch (err) {
     return errorState(err);
   }

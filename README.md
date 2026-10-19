@@ -11,15 +11,15 @@
 | **Dashboard** | Total modal, modal terpakai, idle, laba dibagikan, proyek aktif, posisi tiap investor, daftar proyek. Investor hanya melihat data dirinya sendiri. |
 | **Investor** | Master data pemodal (+ **email**), aksi cepat **Setor/Tarik** modal, dan tombol **Kartu** (statement yang dapat dicetak/PDF). |
 | **Pihak Ketiga** | Master data rekanan proyek (**email, alamat, status**). Dipakai untuk menautkan pengguna berperan `client`. |
-| **Funding** | **Kolam dana** milik satu client yang menghimpun dana beberapa investor (**kontribusi**), mengatur **bagi hasil** (persen investor/client + aturan rugi), dan menerima **pengembalian pokok** dari client. Satu Funding membiayai beberapa proyek. Admin/operator. |
+| **Funding** | **Kolam dana** milik satu client yang menghimpun dana beberapa investor (**kontribusi**), mengatur **bagi hasil** (persen investor/client + aturan rugi), dan menerima **pengembalian pokok** dari client. Satu Funding membiayai beberapa proyek. Siklus status: `Draft` → `Komplit` → `Berjalan` → `Lunas`. Admin/operator. |
 | **Proyek** | Master proyek (wajib memilih **Funding** + `alokasi_budget`), transaksi proyek (pendapatan/biaya), **Bagi Hasil**, **Tutup Proyek**. Buat/ubah/hapus proyek dilakukan **admin** (di sini) dan **client** (di Proyek Saya); operator read-only. **Investor** dapat membuka **detail proyek** (read-only, tanpa aksi) untuk proyek yang ia danai. |
 | **Mutasi Modal** | Riwayat setoran/penarikan modal, filter per investor, rekap netto. |
 | **Bagi Hasil** | Riwayat pembagian laba per proyek per investor beserta porsi (%). |
 | **Laporan** | Rekap investor, rekap proyek, riwayat bagi hasil, **export CSV**, dan **cetak**. Investor melihat versi ter-scope + **Ringkasan Funding** yang ia ikuti. |
-| **Pengguna** | Kelola akun (khusus admin): peran, tautan ke investor/pihak ketiga, reset password, aktif/nonaktif. |
+| **Pengguna** | Kelola akun (khusus admin): peran, tautan ke investor/pihak ketiga, **reset password ke `pass-123`**, aktif/nonaktif. |
 | **Kartu Saya** | Halaman investor: statement dirinya sendiri + **ringkasan Funding**. |
-| **Proyek Saya** | Halaman client: daftar proyek milik pihak ketiganya. Client dapat **menambah/mengubah/menghapus proyeknya** (wajib memilih Funding miliknya), **menutup proyek** yang selesai (memicu notifikasi email ke investor), dan membuka **Buka Ledger** per proyek. |
-| **Ledger Proyek** | Ledger **Debet/Kredit** per proyek. Ditampilkan sebagai tabel **No · Tanggal · Deskripsi · Debet · Kredit · Keterangan** (nilai masuk ke kolom Debet/Kredit sesuai jenis) dengan baris **Total**. **Hanya peran `client`** yang dapat menambah/ubah/menghapus entri — dan hanya untuk proyek milik pihak ketiganya. Peran lain hanya **membaca** (read-only) di detail proyek. |
+| **Proyek Saya** | Halaman client: daftar proyek milik pihak ketiganya (kolom Funding menampilkan **nama + total dana terhimpun**). Client dapat **menambah/mengubah/menghapus proyeknya** (wajib memilih Funding `Komplit` beraturan hasil + wajib mengisi Alokasi Budget), **menutup proyek** yang selesai (memicu notifikasi email ke investor), dan membuka **Buka Ledger** per proyek. Proyek `Ditutup` hanya bisa dibaca. |
+| **Ledger Proyek** | Ledger **Debet/Kredit** per proyek. Ditampilkan sebagai tabel **No · Tanggal · Deskripsi · Debet · Kredit · Keterangan** (nilai masuk ke kolom Debet/Kredit sesuai jenis) dengan baris **Total**. **Hanya peran `client`** yang dapat menambah/ubah/menghapus entri — dan hanya untuk proyek milik pihak ketiganya. Peran lain hanya **membaca** (read-only) di detail proyek; Ledger **terkunci** saat proyek `Ditutup` (admin dapat membuka kembali proyek). |
 | **Ganti Password** | Setiap pengguna dapat mengganti password sendiri (wajib tahu password lama). |
 
 ### Aturan bisnis inti
@@ -40,11 +40,21 @@
 5. **ID format** (`INV-0001`, `PRJ-0001`, …) dan bersifat atomik via tabel `counters`.
 6. Penarikan modal maupun **kontribusi ke Funding** tidak boleh melebihi **saldo idle**.
 7. Proyek berlaba **wajib dibagikan** sebelum bisa ditutup, dan tidak bisa dibagikan dua kali.
-8. **Setiap proyek wajib punya Funding**; Funding hanya bisa dihapus bila belum dipakai
-   proyek/kontribusi. **Penutupan proyek** mengirim **notifikasi email** ke investor
-   pendana (default mode `log` — belum mengirim email sungguhan).
+8. **Setiap proyek wajib punya Funding** dan **wajib mengisi Alokasi Budget**. Funding hanya bisa
+   dihapus bila belum dipakai proyek/kontribusi. **Penutupan proyek** mengirim **notifikasi email**
+   ke investor pendana (default mode `log` — belum mengirim email sungguhan).
 9. **Penghapusan proyek** hanya untuk proyek `Draft` tanpa riwayat keuangan
    (transaksi/ledger/bagi hasil) — menjaga jejak audit.
+10. **Siklus Funding**: `Draft` → `Komplit` (total kontribusi mencapai target, atau ditetapkan
+    admin/operator) → `Berjalan` (dana dipakai proyek) → `Lunas` (pokok dikembalikan). **Client
+    hanya boleh memilih Funding `Komplit` yang sudah punya aturan bagi hasil**; jumlah porsi
+    investor + client wajib **tepat 100%**; jatuh tempo bagi hasil = **N bulan** setelah jatuh
+    tempo Funding.
+11. **Siklus proyek**: proyek baru berstatus `Draft` dan menjadi `Berjalan` saat **entri Ledger
+    pertama** ditambahkan → `Selesai` setelah bagi hasil → `Ditutup` setelah penutupan.
+12. Proyek `Ditutup` **mengunci Ledger** (hanya baca); **admin** dapat **membuka kembali** proyek
+    untuk koreksi (status dipulihkan sesuai riwayat). Dashboard menampilkan **Total Profit proyek
+    `Ditutup`** dan daftar **Funding** (admin/operator).
 
 ### Peran & menu
 
@@ -53,10 +63,10 @@
 | Dashboard | ✔ | ✔ | ✔ (data sendiri) | ✖ |
 | Kartu Saya | ✖ | ✖ | ✔ (termasuk ringkasan Funding) | ✖ |
 | Funding (kolam dana) | ✔ (kelola + kontribusi + aturan hasil + pengembalian) | ✔ (idem, tanpa pengguna) | ✖ (ringkasan via Laporan/Kartu) | ✖ |
-| Proyek (daftar internal) | ✔ (buat/ubah/hapus) | ✔ (baca) | ✖ | ✖ |
+| Proyek (daftar internal) | ✔ (buat/ubah/hapus + buka kembali proyek `Ditutup`) | ✔ (baca) | ✖ | ✖ |
 | Detail Proyek | ✔ | ✔ | ✔ (hanya proyek yang ia danai, read-only) | ✖ |
 | Proyek Saya | ✖ | ✖ | ✖ | ✔ (buat/ubah/hapus + tutup proyek sendiri) |
-| Ledger Proyek | ✔ (baca, di detail proyek) | ✔ (baca, di detail proyek) | ✔ (baca, di detail proyek yang ia danai) | ✔ (CRUD, proyek sendiri) |
+| Ledger Proyek | ✔ (baca, di detail proyek) | ✔ (baca, di detail proyek) | ✔ (baca, di detail proyek yang ia danai) | ✔ (CRUD, proyek sendiri; terkunci saat `Ditutup`) |
 | Investor / Mutasi Modal / Bagi Hasil / Pihak Ketiga | ✔ | ✔ | ✖ | ✖ |
 | Laporan | ✔ | ✔ | ✔ (ter-scope + ringkasan Funding) | ✖ |
 | Pengguna | ✔ | ✖ | ✖ | ✖ |
@@ -165,13 +175,18 @@ Perbedaan teknis yang disengaja:
   langsung: satu Funding milik satu client menghimpun **kontribusi** beberapa investor dan
   membiayai **beberapa proyek**. Saldo "terpakai" kini bersumber dari `funding_contributions`;
   tabel lama `project_funding` **tetap ada tapi dorman** (tanpa konversi data). Bagi hasil
-  mengikuti persen `invest_agreements`, pokok dikembalikan lewat `funding_returns`, dan
-  **penutupan proyek** mengirim **notifikasi email** (mode `log`). Lihat PRD §7.18.
+  mengikuti persen `invest_agreements` (wajib total **100%**), pokok dikembalikan lewat
+  `funding_returns`, dan **penutupan proyek** mengirim **notifikasi email** (mode `log`).
+  Status Funding: `Draft` → `Komplit` (kontribusi mencapai target) → `Berjalan` (dana dipakai
+  proyek) → `Lunas`. Lihat PRD §7.18.
 - **Sebagian kepemilikan proyek diserahkan ke client**: peran `client` dapat
-  membuat/mengubah/menghapus proyek **miliknya** (pihak ketiga terisi otomatis,
-  wajib memilih Funding miliknya) dan **menutup proyek** lewat menu **Proyek Saya**;
-  admin tetap mengelola semua proyek di menu **Proyek**, sedangkan operator hanya membaca.
-  Penghapusan proyek hanya untuk `Draft` tanpa riwayat keuangan.
+  membuat/mengubah/menghapus proyek **miliknya** (pihak ketiga terisi otomatis, **wajib
+  mengisi Alokasi Budget**, dan **hanya boleh memilih Funding `Komplit` yang sudah beraturan
+  bagi hasil**) dan **menutup proyek** lewat menu **Proyek Saya**; admin tetap mengelola semua
+  proyek di menu **Proyek** (termasuk **membuka kembali** proyek `Ditutup`), sedangkan operator
+  hanya membaca. Penghapusan proyek hanya untuk `Draft` tanpa riwayat keuangan. Proyek baru
+  berstatus `Draft` hingga **entri Ledger pertama** membuatnya `Berjalan`; proyek `Ditutup`
+  mengunci Ledger.
 - **Standar tampilan tabel** (`src/components/app/data-table.tsx`, `DataTable`) dipakai
   oleh **semua** daftar data: paginasi maksimum **10 baris/halaman** + kotak **pencarian**
   yang muncul otomatis bila data lebih dari satu halaman, dengan toolbar aksi/filter dan
@@ -192,7 +207,7 @@ Perbedaan teknis yang disengaja:
 ## 6. Pengujian
 
 ```powershell
-npm test          # 44 uji: 30 logika murni + 14 integrasi PostgreSQL
+npm test          # 50 uji: 32 logika murni + 18 integrasi PostgreSQL
 ```
 
 Uji integrasi otomatis dilewati bila `DATABASE_URL` tidak tersedia, sehingga

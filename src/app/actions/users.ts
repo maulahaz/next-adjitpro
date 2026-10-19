@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { requireRoles } from "@/lib/auth/guard";
 import { rolesAdmin } from "@/lib/domain/permissions";
+import { DEFAULT_RESET_PASSWORD } from "@/lib/constants";
 import { deleteUser, resetUserPassword, saveUser } from "@/lib/services/users";
 import { errorState, ok, str } from "@/lib/actions-util";
 import type { ActionState } from "@/lib/action-types";
@@ -44,7 +45,10 @@ export async function deleteUserAction(_prev: ActionState, formData: FormData): 
   }
 }
 
-/** Reset password pengguna — pengganti `apiResetUserPassword` (khusus admin). */
+/**
+ * Reset password pengguna — pengganti `apiResetUserPassword` (khusus admin).
+ * Password selalu direset ke `DEFAULT_RESET_PASSWORD` ("pass-123").
+ */
 export async function resetUserPasswordAction(
   _prev: ActionState,
   formData: FormData,
@@ -55,9 +59,9 @@ export async function resetUserPasswordAction(
     if (String(id) === String(session.userId)) {
       return { ok: false, message: 'Gunakan menu "Ganti Password" untuk akun Anda sendiri.' };
     }
-    await resetUserPassword(id, String(formData.get("newPassword") ?? ""), session.username);
+    await resetUserPassword(id, DEFAULT_RESET_PASSWORD, session.username);
     revalidatePath("/users");
-    return ok("Password pengguna direset.");
+    return ok(`Password pengguna direset ke "${DEFAULT_RESET_PASSWORD}".`);
   } catch (err) {
     return errorState(err);
   }

@@ -11,7 +11,7 @@
 import { asc, eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { projectLedgers, projects } from "@/lib/db/schema";
-import { LEDGER_TIPE } from "@/lib/constants";
+import { LEDGER_TIPE, STATUS } from "@/lib/constants";
 import { todayStr, toDateString } from "@/lib/domain/dates";
 import { parseMoneyInput } from "@/lib/domain/money";
 import { AppError } from "@/lib/errors";
@@ -82,7 +82,12 @@ export async function saveProjectLedger(
   const projectId = String(data.projectId ?? "").trim();
   if (!projectId) throw new AppError("Proyek wajib dipilih.");
 
-  await assertOwnedProject(projectId, scope.thirdPartyId);
+  const project = await assertOwnedProject(projectId, scope.thirdPartyId);
+  if (project.status === STATUS.PROYEK_DITUTUP) {
+    throw new AppError(
+      "Proyek sudah ditutup. Ledger tidak bisa diubah. Minta Admin membuka kembali proyek untuk koreksi.",
+    );
+  }
 
   const jenis = data.jenis === LEDGER_TIPE.KREDIT ? LEDGER_TIPE.KREDIT : LEDGER_TIPE.DEBET;
   const nominal = parseMoneyInput(data.nominal);
@@ -117,6 +122,10 @@ export async function saveProjectLedger(
 
   const inserted = await db.insert(projectLedgers).values(payload).returning({ id: projectLedgers.id });
   const newId = inserted[0]!.id;
+  // Proyek Draft yang mulai diisi Ledger berubah menjadi Berjalan.
+  if (project.status === STATUS.PROYEK_DRAFT) {
+    await db.update(projects).set({ status: STATUS.PROYEK_BERJALAN }).where(eq(projects.id, projectId));
+  }
   await logAudit({
     aksi: "CREATE",
     sheet: "ProjectLedger",
@@ -136,7 +145,12 @@ export async function deleteProjectLedger(
   const existing = await getLedgerRow(id);
   if (!existing) throw new AppError("Entri ledger tidak ditemukan.");
 
-  await assertOwnedProject(existing.projectId, scope.thirdPartyId);
+  const project = await assertOwnedProject(existing.projectId, scope.thirdPartyId);
+  if (project.status === STATUS.PROYEK_DITUTUP) {
+    throw new AppError(
+      "Proyek sudah ditutup. Ledger tidak bisa diubah. Minta Admin membuka kembali proyek untuk koreksi.",
+    );
+  }
 
   await db.delete(projectLedgers).where(eq(projectLedgers.id, id));
   await logAudit({ aksi: "DELETE", sheet: "ProjectLedger", recordId: String(id), user: actor });

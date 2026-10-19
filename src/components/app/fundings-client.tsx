@@ -18,6 +18,7 @@ import type { ThirdPartyDTO } from "@/lib/services/third-parties";
 
 const STATUS_OPTIONS = [
   { value: "Draft", label: "Draft" },
+  { value: "Komplit", label: "Komplit (siap dipakai client)" },
   { value: "Berjalan", label: "Berjalan" },
   { value: "Lunas", label: "Lunas" },
   { value: "Dibatalkan", label: "Dibatalkan" },

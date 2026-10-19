@@ -49,7 +49,76 @@ export default async function DashboardPage() {
           value={String(data.proyekAktif)}
           sub={`Total ${data.jumlahProyek} proyek`}
         />
+        <StatCard
+          label="Profit Proyek Ditutup"
+          value={formatRupiah(data.labaDitutup)}
+          tone={data.labaDitutup < 0 ? "negative" : "positive"}
+          sub={`${data.jumlahProyekDitutup} proyek berstatus Ditutup`}
+        />
+        {!investorView ? (
+          <StatCard
+            label="Funding"
+            value={String(data.fundings.length)}
+            sub={`Target ${formatRupiah(data.fundings.reduce((s, f) => s + f.targetModal, 0))}`}
+          />
+        ) : null}
       </div>
+
+      {!investorView && data.fundings.length > 0 ? (
+        <div className="mt-6 grid">
+          <Card>
+            <CardHeader>
+              <CardTitle>Funding</CardTitle>
+            </CardHeader>
+            <CardContent className="p-0 sm:p-0">
+              <DataTable
+                bordered={false}
+                toolbar={
+                  <Button asChild variant="outline" size="sm">
+                    <Link href="/fundings">Kelola Funding</Link>
+                  </Button>
+                }
+                searchPlaceholder="Cari funding…"
+                emptyMessage="Belum ada Funding."
+                head={
+                  <TableRow>
+                    <TableHead>Funding</TableHead>
+                    <TableHead>Pihak Ketiga</TableHead>
+                    <TableHead className="text-right">Dana Terhimpun</TableHead>
+                    <TableHead className="text-right">Target</TableHead>
+                    <TableHead>Jatuh Tempo</TableHead>
+                    <TableHead>Status</TableHead>
+                  </TableRow>
+                }
+                searchText={data.fundings.map(
+                  (f) => `${f.nama} ${f.pihakKetigaNama ?? ""} ${f.status}`,
+                )}
+                rows={data.fundings.map((f) => (
+                  <TableRow key={f.id}>
+                    <TableCell>
+                      <Link href={`/fundings/${f.id}`}>
+                        <div className="font-medium">{f.nama}</div>
+                      </Link>
+                      <div className="font-mono text-xs text-muted-foreground">{f.id}</div>
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">{f.pihakKetigaNama || "-"}</TableCell>
+                    <TableCell className="text-right tabular-nums">
+                      {formatRupiah(f.totalKontribusi)}
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums">{formatRupiah(f.targetModal)}</TableCell>
+                    <TableCell className="text-xs text-muted-foreground">
+                      {displayDate(f.jatuhTempo)}
+                    </TableCell>
+                    <TableCell>
+                      <StatusPill status={f.status} />
+                    </TableCell>
+                  </TableRow>
+                ))}
+              />
+            </CardContent>
+          </Card>
+        </div>
+      ) : null}
 
       <div className="mt-6 grid">
       {/* <div className="mt-6 grid gap-6 xl:grid-cols-2"> */}

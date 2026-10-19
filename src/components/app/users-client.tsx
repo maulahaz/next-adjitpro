@@ -12,6 +12,7 @@ import { StatusPill } from "@/components/app/ui-helpers";
 import { Badge } from "@/components/ui/badge";
 import { TableCell, TableHead, TableRow } from "@/components/ui/table";
 import { deleteUserAction, resetUserPasswordAction, saveUserAction } from "@/app/actions/users";
+import { DEFAULT_RESET_PASSWORD } from "@/lib/constants";
 import { ROLE_LABEL } from "@/lib/domain/permissions";
 import type { UserDTO } from "@/lib/services/users";
 import type { InvestorDTO } from "@/lib/services/investors";
@@ -109,21 +110,18 @@ export function UsersClient({
               >
                 <UserFields user={u} investors={investors} thirdParties={thirdParties} />
               </FormDialog>
-              <FormDialog
+              <ConfirmDialog
                 trigger={
                   <Button variant="ghost" size="icon" aria-label="Reset password">
                     <KeyRound className="h-4 w-4" />
                   </Button>
                 }
                 title={`Reset Password — ${u.username}`}
+                description={`Reset password ${u.username} ke "${DEFAULT_RESET_PASSWORD}"? Pengguna dapat menggantinya nanti lewat menu Ganti Password.`}
                 action={resetUserPasswordAction}
-                submitLabel="Reset Password"
-              >
-                <input type="hidden" name="id" value={u.id} />
-                <Field label="Password Baru" htmlFor={`rp-${u.id}`} required hint="Minimal 6 karakter.">
-                  <Input id={`rp-${u.id}`} name="newPassword" type="password" minLength={6} required />
-                </Field>
-              </FormDialog>
+                confirmLabel="Reset Password"
+                hidden={{ id: u.id }}
+              />
               {u.id !== currentUserId ? (
                 <ConfirmDialog
                   trigger={

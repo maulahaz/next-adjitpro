@@ -1,5 +1,6 @@
 "use client";
 
+import * as React from "react";
 import Link from "next/link";
 import { ArrowLeft, Coins, FileText, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -19,8 +20,8 @@ import {
   saveAgreementAction,
 } from "@/app/actions/fundings";
 import { formatPorsi, formatRupiah } from "@/lib/domain/money";
-import { displayDate, todayStr } from "@/lib/domain/dates";
-import type { FundingDetailDTO } from "@/lib/services/fundings";
+import { addMonths, displayDate, monthsBetween, todayStr } from "@/lib/domain/dates";
+import type { FundingDetailDTO, InvestAgreementDTO } from "@/lib/services/fundings";
 import type { InvestorDTO } from "@/lib/services/investors";
 
 const LOSS_RULE_OPTIONS = [
@@ -87,7 +88,18 @@ export function FundingDetailClient({
             <Info label="Porsi Investor" value={`${formatPorsi(agreement?.profitInvestor ?? 0)}%`} />
             <Info label="Porsi Client" value={`${formatPorsi(agreement?.profitClient ?? 0)}%`} />
             <Info label="Aturan Rugi" value={agreement?.lossRule ?? "Proporsional"} />
-            <Info label="Jatuh Tempo" value={displayDate(agreement?.jatuhTempo ?? funding.jatuhTempo)} />
+            <Info
+              label="Jatuh Tempo Bagi Hasil"
+              value={
+                agreement
+                  ? `${displayDate(agreement.jatuhTempo)}${
+                      funding.jatuhTempo
+                        ? ` (${monthsBetween(funding.jatuhTempo, agreement.jatuhTempo)} bulan setelah jatuh tempo Funding)`
+                        : ""
+                    }`
+                  : `${displayDate(funding.jatuhTempo)}`
+              }
+            />
           </div>
           {agreement?.principalTerm ? (
             <p className="text-sm text-muted-foreground">Ketentuan pokok: {agreement.principalTerm}</p>
@@ -102,57 +114,7 @@ export function FundingDetailClient({
             description="Persentase laba untuk investor dan client. Bagian investor dibagi pro-rata ke kontributor funding."
             action={saveAgreementAction}
           >
-            <input type="hidden" name="fundingId" value={funding.id} />
-            <div className="grid gap-4 sm:grid-cols-2">
-              <Field label="Porsi Investor (%)" htmlFor="ag-pi" required>
-                <Input
-                  id="ag-pi"
-                  name="profitInvestor"
-                  type="number"
-                  min={0}
-                  max={100}
-                  step={0.01}
-                  defaultValue={String(agreement?.profitInvestor ?? 70)}
-                  required
-                />
-              </Field>
-              <Field label="Porsi Client (%)" htmlFor="ag-pc" required>
-                <Input
-                  id="ag-pc"
-                  name="profitClient"
-                  type="number"
-                  min={0}
-                  max={100}
-                  step={0.01}
-                  defaultValue={String(agreement?.profitClient ?? 30)}
-                  required
-                />
-              </Field>
-            </div>
-            <Field label="Aturan Rugi" htmlFor="ag-loss">
-              <SelectInput
-                id="ag-loss"
-                name="lossRule"
-                options={LOSS_RULE_OPTIONS}
-                defaultValue={agreement?.lossRule ?? "Proporsional"}
-              />
-            </Field>
-            <Field label="Jatuh Tempo" htmlFor="ag-jatuh">
-              <Input
-                id="ag-jatuh"
-                name="jatuhTempo"
-                type="date"
-                defaultValue={agreement?.jatuhTempo || funding.jatuhTempo || ""}
-              />
-            </Field>
-            <Field label="Ketentuan Pengembalian Pokok" htmlFor="ag-term">
-              <Textarea
-                id="ag-term"
-                name="principalTerm"
-                defaultValue={agreement?.principalTerm ?? ""}
-                placeholder="mis. pokok dikembalikan penuh saat jatuh tempo"
-              />
-            </Field>
+            <AgreementFields funding={funding} agreement={agreement} />
           </FormDialog>
         </CardContent>
       </Card>
@@ -374,5 +336,112 @@ function Info({ label, value }: { label: string; value: React.ReactNode }) {
       <div className="text-xs uppercase tracking-wide text-muted-foreground">{label}</div>
       <div className="text-sm font-medium">{value}</div>
     </div>
+  );
+}
+
+/**
+ * Field aturan bagi hasil: porsi investor/client (harus total **100%**) dan
+ * jatuh tempo sebagai **jumlah bulan setelah jatuh tempo Funding**.
+ */
+function AgreementFields({
+  funding,
+  agreement,
+}: {
+  funding: FundingDetailDTO["funding"];
+  agreement: InvestAgreementDTO | null;
+}) {
+  const [pi, setPi] = React.useState(String(agreement?.profitInvestor ?? 70));
+  const [pc, setPc] = React.useState(String(agreement?.profitClient ?? 30));
+  const [months, setMonths] = React.useState(
+    agreement?.jatuhTempo && funding.jatuhTempo
+      ? String(monthsBetween(funding.jatuhTempo, agreement.jatuhTempo))
+      : "0",
+  );
+
+  const toN = (v: string) => {
+    const n = Number(String(v).trim().replace(",", "."));
+    return Number.isFinite(n) ? n : 0;
+  };
+  const total = Math.round((toN(pi) + toN(pc)) * 100) / 100;
+  const sisa = Math.round((100 - total) * 100) / 100;
+  const preview = funding.jatuhTempo ? addMonths(funding.jatuhTempo, Math.trunc(toN(months))) : "";
+
+  return (
+    <>
+      <input type="hidden" name="fundingId" value={funding.id} />
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Field label="Porsi Investor (%)" htmlFor="ag-pi" required>
+          <Input
+            id="ag-pi"
+            name="profitInvestor"
+            type="number"
+            min={0}
+            max={100}
+            step={0.01}
+            value={pi}
+            onChange={(e) => setPi(e.target.value)}
+            required
+          />
+        </Field>
+        <Field label="Porsi Client (%)" htmlFor="ag-pc" required>
+          <Input
+            id="ag-pc"
+            name="profitClient"
+            type="number"
+            min={0}
+            max={100}
+            step={0.01}
+            value={pc}
+            onChange={(e) => setPc(e.target.value)}
+            required
+          />
+        </Field>
+      </div>
+      <p className={`text-sm ${total === 100 ? "text-muted-foreground" : "text-destructive"}`}>
+        Total porsi: {total}%{total === 100 ? " ✓" : ` — sisa ${sisa}%`} (harus tepat 100%).
+      </p>
+
+      <Field label="Aturan Rugi" htmlFor="ag-loss">
+        <SelectInput
+          id="ag-loss"
+          name="lossRule"
+          options={LOSS_RULE_OPTIONS}
+          defaultValue={agreement?.lossRule ?? "Proporsional"}
+        />
+      </Field>
+
+      <Field
+        label="Jatuh Tempo Bagi Hasil (bulan setelah jatuh tempo Funding)"
+        htmlFor="ag-months"
+        hint={`Jatuh tempo Funding: ${displayDate(funding.jatuhTempo)}`}
+        required
+      >
+        <Input
+          id="ag-months"
+          name="jatuhTempoMonths"
+          type="number"
+          min={0}
+          step={1}
+          value={months}
+          onChange={(e) => setMonths(e.target.value)}
+          required
+        />
+      </Field>
+      {preview ? (
+        <p className="text-sm text-muted-foreground">
+          Client wajib membagikan keuntungan paling lambat{" "}
+          <strong>{displayDate(preview)}</strong>.
+        </p>
+      ) : null}
+
+      <Field label="Ketentuan Pengembalian Pokok" htmlFor="ag-term">
+        <Textarea
+          id="ag-term"
+          name="principalTerm"
+          defaultValue={agreement?.principalTerm ?? ""}
+          placeholder="mis. pokok dikembalikan penuh saat jatuh tempo"
+        />
+      </Field>
+    </>
   );
 }

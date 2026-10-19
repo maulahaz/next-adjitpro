@@ -23,13 +23,17 @@ const JENIS_OPTIONS = [
 /**
  * Ledger proyek — panel CRUD untuk peran `client`.
  * Otorisasi tetap ditegakkan di server (Server Action + service).
+ * Bila proyek sudah `Ditutup`, panel menjadi read-only (lihat `readOnly`).
  */
 export function ProjectLedgerClient({
   projectId,
   ledgers,
+  readOnly = false,
 }: {
   projectId: string;
   ledgers: ProjectLedgerDTO[];
+  /** Proyek sudah `Ditutup` → Ledger hanya bisa dibaca (menunggu Admin membuka kembali). */
+  readOnly?: boolean;
 }) {
   const totals = computeLedgerTotals(ledgers);
 
@@ -45,6 +49,13 @@ export function ProjectLedgerClient({
         />
       </div>
 
+      {readOnly ? (
+        <div className="rounded-lg border border-dashed p-3 text-sm text-muted-foreground">
+          Proyek sudah <strong>Ditutup</strong> — Ledger hanya bisa dibaca. Minta Admin membuka
+          kembali proyek bila ada kesalahan input yang perlu diperbaiki.
+        </div>
+      ) : null}
+
       <Card>
         <CardHeader>
           <CardTitle>Ledger ({ledgers.length})</CardTitle>
@@ -53,17 +64,19 @@ export function ProjectLedgerClient({
           <DataTable
             bordered={false}
             toolbar={
-              <FormDialog
-                trigger={
-                  <Button size="sm">
-                    <Plus className="h-4 w-4" /> Entri Ledger
-                  </Button>
-                }
-                title="Tambah Entri Ledger"
-                action={saveLedgerAction}
-              >
-                <LedgerFields projectId={projectId} />
-              </FormDialog>
+              readOnly ? null : (
+                <FormDialog
+                  trigger={
+                    <Button size="sm">
+                      <Plus className="h-4 w-4" /> Entri Ledger
+                    </Button>
+                  }
+                  title="Tambah Entri Ledger"
+                  action={saveLedgerAction}
+                >
+                  <LedgerFields projectId={projectId} />
+                </FormDialog>
+              )
             }
             searchPlaceholder="Cari entri (deskripsi/keterangan)…"
             emptyMessage="Belum ada entri ledger pada proyek ini."
@@ -100,35 +113,39 @@ export function ProjectLedgerClient({
                     {l.keterangan || "-"}
                   </TableCell>
                   <TableCell>
-                    <div className="flex justify-end gap-1">
-                      <FormDialog
-                        trigger={
-                          <Button variant="ghost" size="icon" aria-label="Ubah">
-                            <Pencil className="h-4 w-4" />
-                          </Button>
-                        }
-                        title="Ubah Entri Ledger"
-                        action={saveLedgerAction}
-                      >
-                        <LedgerFields projectId={projectId} entry={l} />
-                      </FormDialog>
-                      <ConfirmDialog
-                        trigger={
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            aria-label="Hapus"
-                            className="text-destructive"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        }
-                        title="Hapus Entri Ledger"
-                        description={`Hapus entri ${l.jenis} ${formatRupiah(l.nominal)}?`}
-                        action={deleteLedgerAction}
-                        hidden={{ id: String(l.id), projectId }}
-                      />
-                    </div>
+                    {readOnly ? (
+                      <div className="text-right text-xs text-muted-foreground">—</div>
+                    ) : (
+                      <div className="flex justify-end gap-1">
+                        <FormDialog
+                          trigger={
+                            <Button variant="ghost" size="icon" aria-label="Ubah">
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                          }
+                          title="Ubah Entri Ledger"
+                          action={saveLedgerAction}
+                        >
+                          <LedgerFields projectId={projectId} entry={l} />
+                        </FormDialog>
+                        <ConfirmDialog
+                          trigger={
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              aria-label="Hapus"
+                              className="text-destructive"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          }
+                          title="Hapus Entri Ledger"
+                          description={`Hapus entri ${l.jenis} ${formatRupiah(l.nominal)}?`}
+                          action={deleteLedgerAction}
+                          hidden={{ id: String(l.id), projectId }}
+                        />
+                      </div>
+                    )}
                   </TableCell>
                 </TableRow>
               );

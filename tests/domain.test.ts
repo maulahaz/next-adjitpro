@@ -9,7 +9,7 @@ import { allocateProRata, computePorsi } from "@/lib/domain/prorata";
 import { computeBalances } from "@/lib/domain/balances";
 import { computeProjectTotals, aggregateFundingByInvestor } from "@/lib/domain/project-totals";
 import { formatRupiah, toNum, pad, formatPorsi, parseMoneyInput } from "@/lib/domain/money";
-import { toDateString, nowStr, todayStr } from "@/lib/domain/dates";
+import { toDateString, nowStr, todayStr, addMonths, monthsBetween } from "@/lib/domain/dates";
 import { canWrite, hasRole, isAdmin, isClient, rolesReadInternal, rolesWrite } from "@/lib/domain/permissions";
 import { computeLedgerTotals } from "@/lib/domain/ledger-totals";
 import { splitProjectProfit } from "@/lib/domain/funding-split";
@@ -208,6 +208,22 @@ describe("tanggal", () => {
   it("todayStr / nowStr berformat benar", () => {
     expect(todayStr()).toMatch(/^\d{4}-\d{2}-\d{2}$/);
     expect(nowStr()).toMatch(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/);
+  });
+
+  it("addMonths menambah bulan & menyesuaikan akhir bulan", () => {
+    // Contoh dari kebutuhan: 30 Okt 2026 + 3 bulan = 30 Jan 2027.
+    expect(addMonths("2026-10-30", 3)).toBe("2027-01-30");
+    expect(addMonths("2026-12-31", 1)).toBe("2027-01-31");
+    expect(addMonths("2026-01-31", 1)).toBe("2026-02-28");
+    expect(addMonths("2024-01-31", 1)).toBe("2024-02-29");
+    expect(addMonths("2026-12-31", 0)).toBe("2026-12-31");
+    expect(addMonths("", 3)).toBe("");
+  });
+
+  it("monthsBetween adalah kebalikan addMonths", () => {
+    expect(monthsBetween("2026-10-30", "2027-01-30")).toBe(3);
+    expect(monthsBetween("2026-12-31", "2026-12-31")).toBe(0);
+    expect(monthsBetween("", "2027-01-30")).toBe(0);
   });
 });
 

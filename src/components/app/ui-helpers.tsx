@@ -59,6 +59,7 @@ export function EmptyState({ message }: { message: string }) {
 
 const STATUS_TONE: Record<string, { className: string; label?: string }> = {
   Draft: { className: "bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-200" },
+  Komplit: { className: "bg-sky-500 text-white" },
   Berjalan: { className: "bg-blue-600 text-white" },
   Selesai: { className: "bg-emerald-600 text-white" },
   Ditutup: { className: "bg-violet-600 text-white" },

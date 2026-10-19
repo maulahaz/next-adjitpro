@@ -231,37 +231,65 @@ export async function saveProject(
   if (!funding) throw new AppError("Funding tidak ditemukan.");
 
   const scopeTp = scope?.scopeThirdPartyId;
-  if (scopeTp && funding.pihakKetigaId !== scopeTp) {
-    throw new AppError("Anda tidak memiliki hak akses untuk funding ini.");
+
+  // Muat proyek lama (bila mengubah) — dipakai untuk cek kepemilikan, status
+  // terkunci, dan agar gating Funding tidak berlaku saat tetap memakai Funding yang sama.
+  let existing: Awaited<ReturnType<typeof getProjectRow>> | null = null;
+  if (data.id) {
+    existing = await getProjectRow(data.id);
+    if (!existing) throw new AppError("Proyek tidak ditemukan.");
+    if (scopeTp && existing.pihakKetigaId !== scopeTp) {
+      throw new AppError("Anda tidak memiliki hak akses untuk proyek ini.");
+    }
+    if (existing.status === STATUS.PROYEK_DITUTUP) {
+      throw new AppError("Proyek sudah ditutup dan tidak bisa diubah. Minta Admin membuka kembali proyek.");
+    }
+  }
+
+  if (scopeTp) {
+    if (funding.pihakKetigaId !== scopeTp) {
+      throw new AppError("Anda tidak memiliki hak akses untuk funding ini.");
+    }
+    // Client hanya boleh memakai Funding yang sudah siap (Komplit + beraturan
+    // hasil) saat **memilih** Funding. Bila proyek sudah memakai Funding yang
+    // sama (yang kini mungkin sudah Berjalan), gating tidak diulang.
+    const keepsSameFunding = Boolean(existing && existing.fundingId === fundingId);
+    if (!keepsSameFunding) {
+      if (funding.status !== STATUS.FUND_KOMPLIT) {
+        throw new AppError("Funding belum siap dipakai: status Funding harus Komplit.");
+      }
+      const agr = await db
+        .select({ id: investAgreements.id })
+        .from(investAgreements)
+        .where(eq(investAgreements.fundingId, fundingId))
+        .limit(1);
+      if (!agr.length) {
+        throw new AppError("Funding belum siap dipakai: aturan bagi hasil wajib dibuat terlebih dahulu.");
+      }
+    }
   }
 
   const pihakKetigaId = scopeTp ?? (data.pihakKetigaId || funding.pihakKetigaId || null);
   const alokasi = parseMoneyInput(data.alokasiBudget);
+  if (alokasi <= 0) {
+    throw new AppError("Alokasi budget wajib diisi (estimasi alokasi dari funding).");
+  }
 
   const payload = {
     nama: String(data.nama).trim(),
     pihakKetigaId,
     fundingId,
-    alokasiBudget: alokasi > 0 ? alokasi : null,
+    alokasiBudget: alokasi,
     tanggalMulai: toDateString(data.tanggalMulai) || todayStr(),
     tanggalSelesaiRencana: toDateString(data.tanggalSelesaiRencana) || null,
     catatan: data.catatan ?? "",
   };
 
   if (data.id) {
-    const existing = await getProjectRow(data.id);
-    if (!existing) throw new AppError("Proyek tidak ditemukan.");
-    if (scopeTp && existing.pihakKetigaId !== scopeTp) {
-      throw new AppError("Anda tidak memiliki hak akses untuk proyek ini.");
-    }
-    if (existing.status === STATUS.PROYEK_DITUTUP) {
-      throw new AppError("Proyek sudah ditutup dan tidak bisa diubah.");
-    }
-    // Proyek Draft yang mulai dialokasikan budget dari funding menjadi Berjalan.
-    const status =
-      existing.status === STATUS.PROYEK_DRAFT && alokasi > 0 ? STATUS.PROYEK_BERJALAN : existing.status;
-    await db.update(projects).set({ ...payload, status }).where(eq(projects.id, data.id));
+    await db.update(projects).set(payload).where(eq(projects.id, data.id));
     await logAudit({ aksi: "UPDATE", sheet: "Projects", recordId: data.id, detail: payload.nama, user: actor });
+    // Dana Funding dipakai client -> Funding berstatus Berjalan.
+    await markFundingBerjalan(fundingId);
     const updated = (await getProjectRow(data.id))!;
     const tp = payload.pihakKetigaId ? await getThirdPartyName(payload.pihakKetigaId) : "";
     return mapProject(updated, tp, funding.nama);
@@ -271,11 +299,13 @@ export async function saveProject(
   const row = {
     id,
     ...payload,
-    status: alokasi > 0 ? STATUS.PROYEK_BERJALAN : STATUS.PROYEK_DRAFT,
+    // Proyek baru selalu Draft; menjadi Berjalan saat ada entri Ledger.
+    status: STATUS.PROYEK_DRAFT,
     tanggalSelesaiAktual: null as string | null,
   };
   await db.insert(projects).values(row);
   await logAudit({ aksi: "CREATE", sheet: "Projects", recordId: id, detail: payload.nama, user: actor });
+  await markFundingBerjalan(fundingId);
   const tp = payload.pihakKetigaId ? await getThirdPartyName(payload.pihakKetigaId) : "";
   return mapProject({ ...row, createdAt: new Date() } as never, tp, funding.nama);
 }
@@ -315,6 +345,44 @@ export async function deleteProject(
   await db.delete(projects).where(eq(projects.id, id));
   await logAudit({ aksi: "DELETE", sheet: "Projects", recordId: id, user: actor });
   return true;
+}
+
+/**
+ * Buka kembali proyek yang sudah `Ditutup` (**khusus admin**) untuk koreksi
+ * kesalahan input. Status dipulihkan berurutan: `Selesai` bila sudah
+ * dibagikan, `Berjalan` bila sudah ada entri Ledger, selain itu `Draft`.
+ * `tanggal_selesai_aktual` dikosongkan kembali.
+ */
+export async function reopenProject(id: string, actor: string): Promise<ProjectDTO> {
+  const existing = await getProjectRow(id);
+  if (!existing) throw new AppError("Proyek tidak ditemukan.");
+  if (existing.status !== STATUS.PROYEK_DITUTUP) {
+    throw new AppError("Hanya proyek berstatus Ditutup yang bisa dibuka kembali.");
+  }
+
+  const totals = await computeTotalsFor(id);
+  let next: string = STATUS.PROYEK_DRAFT;
+  if (totals.sudahDibagikan) {
+    next = STATUS.PROYEK_SELESAI;
+  } else {
+    const led = await db
+      .select({ id: projectLedgers.id })
+      .from(projectLedgers)
+      .where(eq(projectLedgers.projectId, id))
+      .limit(1);
+    next = led.length ? STATUS.PROYEK_BERJALAN : STATUS.PROYEK_DRAFT;
+  }
+
+  await db
+    .update(projects)
+    .set({ status: next, tanggalSelesaiAktual: null })
+    .where(eq(projects.id, id));
+  await logAudit({ aksi: "REOPEN", sheet: "Projects", recordId: id, detail: existing.nama, user: actor });
+
+  const updated = (await getProjectRow(id))!;
+  const tp = updated.pihakKetigaId ? await getThirdPartyName(updated.pihakKetigaId) : "";
+  const fund = await getFundingRow(updated.fundingId);
+  return mapProject(updated, tp, fund?.nama ?? "");
 }
 
 /* =========================== PERHITUNGAN ========================== */
@@ -488,4 +556,13 @@ async function getFundingRow(id: string, tx: DbOrTx = db) {
 async function getThirdPartyName(id: string): Promise<string> {
   const rows = await db.select().from(thirdParties).where(eq(thirdParties.id, id)).limit(1);
   return rows[0]?.nama ?? "";
+}
+
+/** Tandai Funding `Komplit` menjadi `Berjalan` karena dananya dipakai proyek. */
+async function markFundingBerjalan(fundingId: string): Promise<void> {
+  if (!fundingId) return;
+  const f = await getFundingRow(fundingId);
+  if (f && f.status === STATUS.FUND_KOMPLIT) {
+    await db.update(fundings).set({ status: STATUS.FUND_BERJALAN }).where(eq(fundings.id, fundingId));
+  }
 }

@@ -107,6 +107,7 @@ export async function saveAgreementAction(_prev: ActionState, formData: FormData
         profitClient: dec(formData, "profitClient"),
         lossRule: str(formData, "lossRule"),
         jatuhTempo: str(formData, "jatuhTempo"),
+        jatuhTempoMonths: str(formData, "jatuhTempoMonths"),
         principalTerm: str(formData, "principalTerm"),
       },
       session.username,

@@ -22,7 +22,7 @@ import { AppError } from "@/lib/errors";
 import { listDistributions, listCapitalTransactions } from "./finance";
 import { loadBalances } from "./ledger";
 import { listProjectsEnriched, type ProjectEnrichedDTO } from "./projects";
-import { listFundingsForInvestor, type FundingSummaryDTO } from "./fundings";
+import { listFundingsForInvestor, listFundings, type FundingSummaryDTO, type FundingDTO } from "./fundings";
 
 /* ============================ DASHBOARD =========================== */
 
@@ -31,11 +31,16 @@ export interface DashboardDTO {
   totalTerpakai: number;
   totalIdle: number;
   labaDibagikan: number;
+  /** Total profit proyek berstatus `Ditutup` (investor: laba miliknya). */
+  labaDitutup: number;
+  jumlahProyekDitutup: number;
   proyekAktif: number;
   jumlahInvestor: number;
   jumlahProyek: number;
   balances: Balance[];
   projects: ProjectEnrichedDTO[];
+  /** Ringkasan Funding untuk admin/operator (investor: kosong). */
+  fundings: FundingDTO[];
   scope: "investor" | "all";
 }
 
@@ -59,20 +64,34 @@ export async function getDashboardScoped(session: SessionUser): Promise<Dashboar
   }
   const labaDibagikan = dists.reduce((s, d) => s + toNum(d.jumlahLaba), 0);
 
+  const closed = projs.filter((p) => p.status === STATUS.PROYEK_DITUTUP);
+  const closedIds = new Set(closed.map((p) => p.id));
+  // Admin/operator: total laba seluruh proyek Ditutup. Investor: laba miliknya.
+  const labaDitutup = isInvestor
+    ? dists
+        .filter((d) => closedIds.has(d.projectId))
+        .reduce((s, d) => s + toNum(d.jumlahLaba), 0)
+    : closed.reduce((s, p) => s + p.laba, 0);
+
   const proyekAktif = projs.filter(
     (p) => p.status === STATUS.PROYEK_BERJALAN || p.status === STATUS.PROYEK_DRAFT,
   ).length;
+
+  const fundings = isInvestor ? [] : await listFundings();
 
   return {
     totalModal,
     totalTerpakai,
     totalIdle,
     labaDibagikan,
+    labaDitutup,
+    jumlahProyekDitutup: closed.length,
     proyekAktif,
     jumlahInvestor: balances.length,
     jumlahProyek: projs.length,
     balances,
     projects: projs,
+    fundings,
     scope: isInvestor ? "investor" : "all",
   };
 }
@@ -99,6 +118,8 @@ export interface ClientProjectDTO {
   pihakKetigaNama: string;
   fundingId: string;
   fundingNama: string;
+  /** Total dana terhimpun pada Funding proyek ini. */
+  fundingTotal: number;
   alokasiBudget: number;
   tanggalMulai: string;
   tanggalSelesaiRencana: string;
@@ -114,13 +135,18 @@ export interface ClientProjectDTO {
 export async function listProjectsForClient(thirdPartyId: string): Promise<ClientProjectDTO[]> {
   if (!thirdPartyId) return [];
 
-  const [rows, tps, funds] = await Promise.all([
+  const [rows, tps, funds, contribs] = await Promise.all([
     db.select().from(projects).where(eq(projects.pihakKetigaId, thirdPartyId)).orderBy(asc(projects.id)),
     db.select().from(thirdParties),
     db.select().from(fundings),
+    db.select().from(fundingContributions),
   ]);
   const tpMap = new Map(tps.map((t) => [t.id, t.nama]));
   const fundMap = new Map(funds.map((f) => [f.id, f.nama]));
+  const totalByFunding = new Map<string, number>();
+  for (const c of contribs) {
+    totalByFunding.set(c.fundingId, (totalByFunding.get(c.fundingId) ?? 0) + toNum(c.jumlah));
+  }
 
   return rows.map((p) => ({
     id: p.id,
@@ -129,6 +155,7 @@ export async function listProjectsForClient(thirdPartyId: string): Promise<Clien
     pihakKetigaNama: tpMap.get(p.pihakKetigaId ?? "") ?? "",
     fundingId: p.fundingId,
     fundingNama: fundMap.get(p.fundingId) ?? "",
+    fundingTotal: totalByFunding.get(p.fundingId) ?? 0,
     alokasiBudget: toNum(p.alokasiBudget),
     tanggalMulai: toDateString(p.tanggalMulai),
     tanggalSelesaiRencana: toDateString(p.tanggalSelesaiRencana),

@@ -23,6 +23,9 @@ export const DEFAULT_ADMIN = {
   nama: "Administrator",
 } as const;
 
+/** Password standar saat admin mereset password pengguna. */
+export const DEFAULT_RESET_PASSWORD = "pass-123";
+
 export const STATUS = {
   INVESTOR_AKTIF: "Aktif",
   INVESTOR_NONAKTIF: "Nonaktif",
@@ -37,6 +40,7 @@ export const STATUS = {
 
   /** Siklus hidup Funding (kolam dana). */
   FUND_DRAFT: "Draft",
+  FUND_KOMPLIT: "Komplit",
   FUND_BERJALAN: "Berjalan",
   FUND_LUNAS: "Lunas",
   FUND_DIBATALKAN: "Dibatalkan",
@@ -122,7 +126,7 @@ export const CAPITAL_TIPES = ["Setor", "Tarik"] as const;
 export const PROJECT_TIPES = ["Pendapatan", "Biaya"] as const;
 export const LEDGER_TIPES = ["Debet", "Kredit"] as const;
 /** Siklus hidup kolam dana (tabel `fundings`). */
-export const FUNDING_STATUSES = ["Draft", "Berjalan", "Lunas", "Dibatalkan"] as const;
+export const FUNDING_STATUSES = ["Draft", "Komplit", "Berjalan", "Lunas", "Dibatalkan"] as const;
 export const CONTRIB_STATUSES = ["Aktif", "Dikembalikan", "Dibatalkan"] as const;
 export const LOSS_RULES = [LOSS_RULE.PROPORSIONAL, LOSS_RULE.INVESTOR, LOSS_RULE.CLIENT] as const;
 export const ROLE_VALUES = ["admin", "operator", "investor", "client"] as const;

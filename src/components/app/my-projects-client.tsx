@@ -30,26 +30,42 @@ export function MyProjectsClient({
   projects: ClientProjectDTO[];
   fundings: FundingDTO[];
 }) {
-  const fundingOptions = fundings.map((f) => ({
-    value: f.id,
-    label: `${f.nama} (Total: ${formatRupiah(f.targetModal)})`,
-  }));
+  const optionMap = new Map<string, string>();
+  for (const f of fundings) {
+    optionMap.set(f.id, `${f.nama} (Target: ${formatRupiah(f.targetModal)})`);
+  }
+  // Sertakan Funding yang sedang dipakai proyek (mungkin sudah `Berjalan`) agar
+  // tetap bisa dipertahankan saat mengubah proyek.
+  for (const p of projects) {
+    if (p.fundingId && !optionMap.has(p.fundingId)) {
+      optionMap.set(p.fundingId, `${p.fundingNama || p.fundingId} (sedang dipakai proyek)`);
+    }
+  }
+  const fundingOptions = Array.from(optionMap, ([value, label]) => ({ value, label }));
+  const noFunding = fundings.length === 0;
 
   return (
     <DataTable
       toolbar={
-        <FormDialog
-          trigger={
-            <Button>
-              <Plus className="h-4 w-4" /> Proyek Baru
-            </Button>
-          }
-          title="Tambah Proyek"
-          description="Proyek otomatis tertaut ke pihak ketiga akun Anda dan wajib memilih Funding."
-          action={saveProjectAction}
-        >
-          <ClientProjectFields fundingOptions={fundingOptions} />
-        </FormDialog>
+        <div className="flex items-center gap-2">
+          <FormDialog
+            trigger={
+              <Button disabled={noFunding} title={noFunding ? "Belum ada Funding siap pakai." : undefined}>
+                <Plus className="h-4 w-4" /> Proyek Baru
+              </Button>
+            }
+            title="Tambah Proyek"
+            description="Proyek otomatis tertaut ke pihak ketiga akun Anda dan wajib memilih Funding."
+            action={saveProjectAction}
+          >
+            <ClientProjectFields fundingOptions={fundingOptions} />
+          </FormDialog>
+          {noFunding ? (
+            <span className="text-xs text-muted-foreground">
+              Belum ada Funding berstatus Komplit + aturan bagi hasil.
+            </span>
+          ) : null}
+        </div>
       }
       searchPlaceholder="Cari proyek…"
       emptyMessage="Belum ada proyek yang terkait dengan akun Anda."
@@ -65,13 +81,25 @@ export function MyProjectsClient({
         </TableRow>
       }
       searchText={projects.map(
-        (p) => `${p.nama} ${p.id} ${p.fundingNama ?? ""} ${p.status} ${p.catatan ?? ""}`,
+        (p) =>
+          `${p.nama} ${p.id} ${p.fundingNama ?? ""} ${p.status} ${p.catatan ?? ""}`,
       )}
       rows={projects.map((p) => (
         <TableRow key={p.id}>
           <TableCell className="font-mono text-xs">{p.id}</TableCell>
           <TableCell className="font-medium">{p.nama}</TableCell>
-          <TableCell className="text-muted-foreground">{p.fundingNama || "-"}</TableCell>
+          <TableCell className="text-muted-foreground">
+            {p.fundingNama ? (
+              <>
+                {p.fundingNama}
+                <span className="block text-xs">
+                  Total: {formatRupiah(p.fundingTotal)}
+                </span>
+              </>
+            ) : (
+              "-"
+            )}
+          </TableCell>
           <TableCell className="text-right tabular-nums">{formatRupiah(p.alokasiBudget)}</TableCell>
           <TableCell className="text-xs text-muted-foreground">
             {displayDate(p.tanggalMulai)} → {p.tanggalSelesaiAktual || p.tanggalSelesaiRencana || "-"}
@@ -101,28 +129,36 @@ export function MyProjectsClient({
                   <input type="hidden" name="projectId" value={p.id} />
                 </FormDialog>
               ) : null}
-              <FormDialog
-                trigger={
-                  <Button variant="ghost" size="icon" aria-label="Ubah">
-                    <Pencil className="h-4 w-4" />
-                  </Button>
-                }
-                title="Ubah Proyek"
-                action={saveProjectAction}
-              >
-                <ClientProjectFields project={p} fundingOptions={fundingOptions} />
-              </FormDialog>
-              <ConfirmDialog
-                trigger={
-                  <Button variant="ghost" size="icon" aria-label="Hapus" className="text-destructive">
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                }
-                title="Hapus Proyek"
-                description={`Hapus proyek ${p.nama}? Hanya proyek Draft tanpa riwayat keuangan yang bisa dihapus.`}
-                action={deleteProjectAction}
-                hidden={{ id: p.id }}
-              />
+              {p.status !== "Ditutup" ? (
+                <>
+                  <FormDialog
+                    trigger={
+                      <Button variant="ghost" size="icon" aria-label="Ubah">
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                    }
+                    title="Ubah Proyek"
+                    action={saveProjectAction}
+                  >
+                    <ClientProjectFields project={p} fundingOptions={fundingOptions} />
+                  </FormDialog>
+                  <ConfirmDialog
+                    trigger={
+                      <Button variant="ghost" size="icon" aria-label="Hapus" className="text-destructive">
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    }
+                    title="Hapus Proyek"
+                    description={`Hapus proyek ${p.nama}? Hanya proyek Draft tanpa riwayat keuangan yang bisa dihapus.`}
+                    action={deleteProjectAction}
+                    hidden={{ id: p.id }}
+                  />
+                </>
+              ) : (
+                <span className="self-center text-xs text-muted-foreground">
+                  Ditutup — minta Admin membuka kembali untuk koreksi
+                </span>
+              )}
             </div>
           </TableCell>
         </TableRow>
@@ -154,14 +190,20 @@ function ClientProjectFields({
           options={fundingOptions}
         />
       </Field>
-      <Field label="Alokasi Budget (Rp)" htmlFor="mp-alokasi" hint="Estimasi alokasi budget dari funding untuk proyek ini.">
+      <Field
+        label="Alokasi Budget (Rp)"
+        htmlFor="mp-alokasi"
+        hint="Estimasi alokasi budget dari funding untuk proyek ini. Wajib diisi."
+        required
+      >
         <Input
           id="mp-alokasi"
           name="alokasiBudget"
           type="number"
-          min={0}
+          min={1}
           step={1}
           placeholder="0"
+          required
           defaultValue={project?.alokasiBudget ? String(project.alokasiBudget) : ""}
         />
       </Field>
