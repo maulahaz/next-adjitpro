@@ -19,7 +19,7 @@ export default async function ProjectsPage() {
     <div>
       <PageHeader
         title="Proyek"
-        description="Kelola proyek yang dibiayai Funding, catat pendapatan/biaya, lalu bagi hasil."
+        description="Kelola proyek, mitra, dan funding yang terkait dengan proyek."
       />
       <ProjectsClient
         projects={projects}

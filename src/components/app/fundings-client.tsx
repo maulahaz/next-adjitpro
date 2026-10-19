@@ -56,7 +56,7 @@ export function FundingsClient({
         <TableRow>
           <TableHead>ID</TableHead>
           <TableHead>Funding</TableHead>
-          <TableHead>Pihak Ketiga</TableHead>
+          <TableHead>Mitra</TableHead>
           <TableHead className="text-right">Target</TableHead>
           <TableHead className="text-right">Terhimpun</TableHead>
           <TableHead>Jatuh Tempo</TableHead>

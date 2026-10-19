@@ -82,8 +82,8 @@ export default async function DashboardPage() {
                 emptyMessage="Belum ada Funding."
                 head={
                   <TableRow>
-                    <TableHead>Funding</TableHead>
-                    <TableHead>Pihak Ketiga</TableHead>
+                    <TableHead>Nama Funding</TableHead>
+                    <TableHead>Mitra</TableHead>
                     <TableHead className="text-right">Dana Terhimpun</TableHead>
                     <TableHead className="text-right">Target</TableHead>
                     <TableHead>Jatuh Tempo</TableHead>

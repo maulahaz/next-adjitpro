@@ -56,9 +56,9 @@ export function ProjectsClient({
       emptyMessage="Belum ada proyek. Buat proyek pertama Anda."
       head={
         <TableRow>
-          <TableHead>Proyek</TableHead>
-          <TableHead>Pihak Ketiga</TableHead>
-          <TableHead>Funding</TableHead>
+          <TableHead>Nama Proyek</TableHead>
+          <TableHead>Mitra</TableHead>
+          <TableHead>Nama Funding</TableHead>
           <TableHead>Periode</TableHead>
           <TableHead>Status</TableHead>
           <TableHead className="text-right">Modal</TableHead>
