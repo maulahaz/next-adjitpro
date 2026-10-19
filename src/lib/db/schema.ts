@@ -56,6 +56,8 @@ export const investors = pgTable(
     id: text("id").primaryKey(),
     nama: text("nama").notNull(),
     kontak: text("kontak").notNull().default(""),
+    /** Alamat email (dipakai untuk notifikasi, mis. penutupan proyek). */
+    email: text("email").notNull().default(""),
     rekening: text("rekening").notNull().default(""),
     status: text("status").notNull().default("Aktif"),
     tanggalDaftar: date("tanggal_daftar"),
@@ -71,6 +73,9 @@ export const thirdParties = pgTable("third_parties", {
   id: text("id").primaryKey(),
   nama: text("nama").notNull(),
   kontak: text("kontak").notNull().default(""),
+  email: text("email").notNull().default(""),
+  alamat: text("alamat").notNull().default(""),
+  status: text("status").notNull().default("Aktif"),
   catatan: text("catatan").notNull().default(""),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
@@ -83,6 +88,13 @@ export const projects = pgTable(
     id: text("id").primaryKey(),
     nama: text("nama").notNull(),
     pihakKetigaId: text("pihak_ketiga_id"),
+    /**
+     * Funding (kolam dana) yang membiayai proyek ini — WAJIB.
+     * Diisi otomatis saat migrasi data lama (lihat `drizzle/*_funding.sql`).
+     */
+    fundingId: text("funding_id").notNull(),
+    /** Alokasi budget dari funding untuk proyek ini (opsional). */
+    alokasiBudget: bigint("alokasi_budget", { mode: "number" }),
     tanggalMulai: date("tanggal_mulai"),
     tanggalSelesaiRencana: date("tanggal_selesai_rencana"),
     tanggalSelesaiAktual: date("tanggal_selesai_aktual"),
@@ -93,6 +105,7 @@ export const projects = pgTable(
   (t) => ({
     statusIdx: index("projects_status_idx").on(t.status),
     pihakKetigaIdx: index("projects_pihak_ketiga_idx").on(t.pihakKetigaId),
+    fundingIdx: index("projects_funding_idx").on(t.fundingId),
   }),
 );
 
@@ -131,6 +144,92 @@ export const projectFunding = pgTable(
     projectIdx: index("funding_project_idx").on(t.projectId),
     investorIdx: index("funding_investor_idx").on(t.investorId),
   }),
+);
+
+/* ======================= FUNDINGS (KOLAM DANA) ===================== */
+/**
+ * Funding — kolam dana yang dihimpun dari beberapa investor, dimiliki satu
+ * client (pihak ketiga), dan dipakai untuk membiayai beberapa proyek client
+ * tersebut. Modul baru (tidak ada di aplikasi lama).
+ *
+ * `pihak_ketiga_id` & `jatuh_tempo` sengaja nullable di DB (agar Funding
+ * "legacy" hasil migrasi tetap valid) namun WAJIB diisi lewat form.
+ */
+export const fundings = pgTable(
+  "fundings",
+  {
+    id: text("id").primaryKey(),
+    pihakKetigaId: text("pihak_ketiga_id"),
+    nama: text("nama").notNull(),
+    targetModal: bigint("target_modal", { mode: "number" }).notNull().default(0),
+    tanggalMulai: date("tanggal_mulai"),
+    jatuhTempo: date("jatuh_tempo"),
+    /** 'Draft' | 'Berjalan' | 'Lunas' | 'Dibatalkan' */
+    status: text("status").notNull().default("Draft"),
+    catatan: text("catatan").notNull().default(""),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    pihakKetigaIdx: index("fundings_pihak_ketiga_idx").on(t.pihakKetigaId),
+    statusIdx: index("fundings_status_idx").on(t.status),
+  }),
+);
+
+/* ==================== FUNDING CONTRIBUTIONS ======================== */
+/** Kontribusi (penempatan modal) seorang investor ke sebuah Funding. */
+export const fundingContributions = pgTable(
+  "funding_contributions",
+  {
+    id: text("id").primaryKey(),
+    fundingId: text("funding_id").notNull(),
+    investorId: text("investor_id").notNull(),
+    jumlah: bigint("jumlah", { mode: "number" }).notNull().default(0),
+    tanggal: date("tanggal"),
+    /** 'Aktif' | 'Dikembalikan' | 'Dibatalkan' */
+    status: text("status").notNull().default("Aktif"),
+    catatan: text("catatan").notNull().default(""),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    fundingIdx: index("fcontrib_funding_idx").on(t.fundingId),
+    investorIdx: index("fcontrib_investor_idx").on(t.investorId),
+  }),
+);
+
+/* ===================== INVEST AGREEMENTS =========================== */
+/** Aturan bagi hasil (profit/rugi) sebuah Funding — 1 Funding : 1 agreement. */
+export const investAgreements = pgTable(
+  "invest_agreements",
+  {
+    id: text("id").primaryKey(),
+    fundingId: text("funding_id").notNull(),
+    /** Porsi laba untuk investor (persen). */
+    profitInvestor: numeric("profit_investor", { precision: 5, scale: 2 }).notNull().default("0"),
+    /** Porsi laba untuk client (persen). */
+    profitClient: numeric("profit_client", { precision: 5, scale: 2 }).notNull().default("0"),
+    /** 'Proporsional' | 'Investor' | 'Client' */
+    lossRule: text("loss_rule").notNull().default("Proporsional"),
+    jatuhTempo: date("jatuh_tempo"),
+    /** Ketentuan pengembalian pokok (bebas teks). */
+    principalTerm: text("principal_term").notNull().default(""),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({ fundingUq: uniqueIndex("iagree_funding_uq").on(t.fundingId) }),
+);
+
+/* ====================== FUNDING RETURNS ============================ */
+/** Pengembalian pokok Funding oleh client (cicilan/pelunasan). */
+export const fundingReturns = pgTable(
+  "funding_returns",
+  {
+    id: text("id").primaryKey(),
+    fundingId: text("funding_id").notNull(),
+    tanggal: date("tanggal"),
+    jumlah: bigint("jumlah", { mode: "number" }).notNull().default(0),
+    catatan: text("catatan").notNull().default(""),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({ fundingIdx: index("freturn_funding_idx").on(t.fundingId) }),
 );
 
 /* ======================= PROJECT TRANSACTIONS ====================== */
@@ -183,6 +282,8 @@ export const profitDistributions = pgTable(
   {
     id: text("id").primaryKey(),
     projectId: text("project_id").notNull(),
+    /** Funding sumber laba (jejak baru; nullable untuk data lama). */
+    fundingId: text("funding_id"),
     investorId: text("investor_id").notNull(),
     porsi: numeric("porsi", { precision: 9, scale: 4 }).notNull().default("0"),
     jumlahLaba: bigint("jumlah_laba", { mode: "number" }).notNull().default(0),
@@ -251,6 +352,10 @@ export type ThirdPartyRow = typeof thirdParties.$inferSelect;
 export type ProjectRow = typeof projects.$inferSelect;
 export type CapitalTransactionRow = typeof capitalTransactions.$inferSelect;
 export type ProjectFundingRow = typeof projectFunding.$inferSelect;
+export type FundingRow = typeof fundings.$inferSelect;
+export type FundingContributionRow = typeof fundingContributions.$inferSelect;
+export type InvestAgreementRow = typeof investAgreements.$inferSelect;
+export type FundingReturnRow = typeof fundingReturns.$inferSelect;
 export type ProjectTransactionRow = typeof projectTransactions.$inferSelect;
 export type ProjectLedgerRow = typeof projectLedgers.$inferSelect;
 export type ProfitDistributionRow = typeof profitDistributions.$inferSelect;

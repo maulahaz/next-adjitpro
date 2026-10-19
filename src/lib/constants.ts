@@ -34,6 +34,24 @@ export const STATUS = {
 
   FUNDING_AKTIF: "Aktif",
   FUNDING_DIBEBASKAN: "Dibebaskan",
+
+  /** Siklus hidup Funding (kolam dana). */
+  FUND_DRAFT: "Draft",
+  FUND_BERJALAN: "Berjalan",
+  FUND_LUNAS: "Lunas",
+  FUND_DIBATALKAN: "Dibatalkan",
+
+  /** Status kontribusi investor ke Funding. */
+  CONTRIB_AKTIF: "Aktif",
+  CONTRIB_DIKEMBALIKAN: "Dikembalikan",
+  CONTRIB_DIBATALKAN: "Dibatalkan",
+} as const;
+
+/** Aturan pembagian rugi pada `invest_agreements`. */
+export const LOSS_RULE = {
+  PROPORSIONAL: "Proporsional",
+  INVESTOR: "Investor",
+  CLIENT: "Client",
 } as const;
 
 export const TIPE = {
@@ -71,6 +89,10 @@ export const ID_PREFIX = {
   ProjectFunding: "PF",
   ProjectTransactions: "PT",
   ProfitDistributions: "PD",
+  Fundings: "FND",
+  FundingContributions: "FNC",
+  FundingReturns: "FR",
+  InvestAgreements: "IA",
 } as const;
 
 export type EntityName = keyof typeof ID_PREFIX;
@@ -85,15 +107,24 @@ export const ENTITIES: EntityName[] = [
   "ProjectFunding",
   "ProjectTransactions",
   "ProfitDistributions",
+  "Fundings",
+  "FundingContributions",
+  "FundingReturns",
+  "InvestAgreements",
 ];
 
 export const USER_STATUS = ["Aktif", "Nonaktif"] as const;
 export const INVESTOR_STATUS = ["Aktif", "Nonaktif"] as const;
 export const PROJECT_STATUSES = ["Draft", "Berjalan", "Selesai", "Ditutup"] as const;
-export const FUNDING_STATUSES = ["Aktif", "Dibebaskan"] as const;
+/** Status penempatan modal lama (`project_funding`, kini dorman). */
+export const PROJECT_FUNDING_STATUSES = ["Aktif", "Dibebaskan"] as const;
 export const CAPITAL_TIPES = ["Setor", "Tarik"] as const;
 export const PROJECT_TIPES = ["Pendapatan", "Biaya"] as const;
 export const LEDGER_TIPES = ["Debet", "Kredit"] as const;
+/** Siklus hidup kolam dana (tabel `fundings`). */
+export const FUNDING_STATUSES = ["Draft", "Berjalan", "Lunas", "Dibatalkan"] as const;
+export const CONTRIB_STATUSES = ["Aktif", "Dikembalikan", "Dibatalkan"] as const;
+export const LOSS_RULES = [LOSS_RULE.PROPORSIONAL, LOSS_RULE.INVESTOR, LOSS_RULE.CLIENT] as const;
 export const ROLE_VALUES = ["admin", "operator", "investor", "client"] as const;
 
 function numEnv(key: string, fallback: number): number {

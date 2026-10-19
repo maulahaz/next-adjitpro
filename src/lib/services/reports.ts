@@ -1,14 +1,15 @@
 /**
  * Dashboard, posisi investor, dan laporan.
- * Port dari `Reports.gs`.
+ * Port dari `Reports.gs`, disesuaikan dengan model Funding.
  */
 
 import { asc, eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import {
+  fundingContributions,
+  fundings,
   investors,
   projects,
-  projectFunding,
   profitDistributions,
   thirdParties,
 } from "@/lib/db/schema";
@@ -21,6 +22,7 @@ import { AppError } from "@/lib/errors";
 import { listDistributions, listCapitalTransactions } from "./finance";
 import { loadBalances } from "./ledger";
 import { listProjectsEnriched, type ProjectEnrichedDTO } from "./projects";
+import { listFundingsForInvestor, type FundingSummaryDTO } from "./fundings";
 
 /* ============================ DASHBOARD =========================== */
 
@@ -77,14 +79,17 @@ export async function getDashboardScoped(session: SessionUser): Promise<Dashboar
 
 /* ==================== PROYEK PER INVESTOR / CLIENT ================ */
 
-/** Proyek yang diikuti seorang investor. */
+/**
+ * Proyek yang diikuti seorang investor: proyek yang Funding-nya menerima
+ * kontribusi dari investor tersebut.
+ */
 export async function listProjectsForInvestor(investorId: string): Promise<ProjectEnrichedDTO[]> {
-  const [all, fundings] = await Promise.all([
+  const [all, contribs] = await Promise.all([
     listProjectsEnriched(),
-    db.select().from(projectFunding).where(eq(projectFunding.investorId, investorId)),
+    db.select().from(fundingContributions).where(eq(fundingContributions.investorId, investorId)),
   ]);
-  const ids = new Set(fundings.map((f) => f.projectId));
-  return all.filter((p) => ids.has(p.id));
+  const fundingIds = new Set(contribs.map((c) => c.fundingId));
+  return all.filter((p) => fundingIds.has(p.fundingId));
 }
 
 export interface ClientProjectDTO {
@@ -92,6 +97,9 @@ export interface ClientProjectDTO {
   nama: string;
   pihakKetigaId: string;
   pihakKetigaNama: string;
+  fundingId: string;
+  fundingNama: string;
+  alokasiBudget: number;
   tanggalMulai: string;
   tanggalSelesaiRencana: string;
   tanggalSelesaiAktual: string;
@@ -101,22 +109,27 @@ export interface ClientProjectDTO {
 
 /**
  * Proyek milik satu pihak ketiga (role client).
- * SENGAJA tanpa data keuangan (modal, pendapatan, biaya, laba, bagi hasil).
+ * Tanpa data laba internal; hanya info Funding + alokasi budget proyek.
  */
 export async function listProjectsForClient(thirdPartyId: string): Promise<ClientProjectDTO[]> {
   if (!thirdPartyId) return [];
 
-  const [rows, tps] = await Promise.all([
+  const [rows, tps, funds] = await Promise.all([
     db.select().from(projects).where(eq(projects.pihakKetigaId, thirdPartyId)).orderBy(asc(projects.id)),
     db.select().from(thirdParties),
+    db.select().from(fundings),
   ]);
   const tpMap = new Map(tps.map((t) => [t.id, t.nama]));
+  const fundMap = new Map(funds.map((f) => [f.id, f.nama]));
 
   return rows.map((p) => ({
     id: p.id,
     nama: p.nama,
     pihakKetigaId: p.pihakKetigaId ?? "",
     pihakKetigaNama: tpMap.get(p.pihakKetigaId ?? "") ?? "",
+    fundingId: p.fundingId,
+    fundingNama: fundMap.get(p.fundingId) ?? "",
+    alokasiBudget: toNum(p.alokasiBudget),
     tanggalMulai: toDateString(p.tanggalMulai),
     tanggalSelesaiRencana: toDateString(p.tanggalSelesaiRencana),
     tanggalSelesaiAktual: toDateString(p.tanggalSelesaiAktual),
@@ -133,6 +146,7 @@ export interface InvestorStatementDTO {
     id: string;
     nama: string;
     kontak: string;
+    email: string;
     rekening: string;
     status: string;
     tanggalDaftar: string;
@@ -142,12 +156,13 @@ export interface InvestorStatementDTO {
   capitalTransactions: Awaited<ReturnType<typeof listCapitalTransactions>>;
   fundings: {
     id: string;
-    projectNama: string;
+    fundingNama: string;
     jumlah: number;
     tanggal: string;
     status: string;
   }[];
   distributions: Awaited<ReturnType<typeof listDistributions>>;
+  fundingSummary: FundingSummaryDTO[];
 }
 
 /** Statement lengkap seorang investor (Kartu Investor). */
@@ -156,15 +171,16 @@ export async function getInvestorStatement(investorId: string): Promise<Investor
   const inv = invRows[0];
   if (!inv) throw new AppError("Investor tidak ditemukan.");
 
-  const [balances, capital, fundRows, projs, dists] = await Promise.all([
+  const [balances, capital, contribRows, fundRows, dists, summary] = await Promise.all([
     loadBalances(),
     listCapitalTransactions(investorId),
-    db.select().from(projectFunding).where(eq(projectFunding.investorId, investorId)),
-    db.select().from(projects),
+    db.select().from(fundingContributions).where(eq(fundingContributions.investorId, investorId)),
+    db.select().from(fundings),
     listDistributions(),
+    listFundingsForInvestor(investorId),
   ]);
 
-  const pMap = new Map(projs.map((p) => [p.id, p.nama]));
+  const fundMap = new Map(fundRows.map((f) => [f.id, f.nama]));
   const balance = balances.find((b) => String(b.id) === String(investorId)) ?? null;
 
   return {
@@ -173,6 +189,7 @@ export async function getInvestorStatement(investorId: string): Promise<Investor
       id: inv.id,
       nama: inv.nama || "",
       kontak: inv.kontak || "",
+      email: inv.email || "",
       rekening: inv.rekening || "",
       status: inv.status || STATUS.INVESTOR_AKTIF,
       tanggalDaftar: toDateString(inv.tanggalDaftar),
@@ -180,14 +197,18 @@ export async function getInvestorStatement(investorId: string): Promise<Investor
     },
     balance,
     capitalTransactions: capital,
-    fundings: fundRows.map((f) => ({
-      id: f.id,
-      projectNama: pMap.get(f.projectId) ?? "(?)",
-      jumlah: toNum(f.jumlah),
-      tanggal: toDateString(f.tanggal),
-      status: f.status || STATUS.FUNDING_AKTIF,
-    })),
+    fundings: contribRows
+      .slice()
+      .sort((a, b) => a.id.localeCompare(b.id))
+      .map((c) => ({
+        id: c.id,
+        fundingNama: fundMap.get(c.fundingId) ?? "(?)",
+        jumlah: toNum(c.jumlah),
+        tanggal: toDateString(c.tanggal),
+        status: c.status || STATUS.CONTRIB_AKTIF,
+      })),
     distributions: dists.filter((d) => String(d.investorId) === String(investorId)),
+    fundingSummary: summary,
   };
 }
 
@@ -197,6 +218,7 @@ export interface ReportsDTO {
   balances: Balance[];
   projects: ProjectEnrichedDTO[];
   distributions: Awaited<ReturnType<typeof listDistributions>>;
+  fundingSummary: FundingSummaryDTO[];
 }
 
 export async function getReports(): Promise<ReportsDTO> {
@@ -205,20 +227,22 @@ export async function getReports(): Promise<ReportsDTO> {
     listProjectsEnriched(),
     listDistributions(),
   ]);
-  return { balances, projects: projs, distributions: dists };
+  return { balances, projects: projs, distributions: dists, fundingSummary: [] };
 }
 
 export async function getReportsScoped(session: SessionUser): Promise<ReportsDTO> {
   if (session.role !== ROLES.INVESTOR) return getReports();
 
-  const [balances, projs, dists] = await Promise.all([
+  const [balances, projs, dists, summary] = await Promise.all([
     loadBalances(),
     listProjectsForInvestor(session.investorId),
     listDistributions(),
+    listFundingsForInvestor(session.investorId),
   ]);
   return {
     balances: balances.filter((b) => String(b.id) === String(session.investorId)),
     projects: projs,
     distributions: dists.filter((d) => String(d.investorId) === String(session.investorId)),
+    fundingSummary: summary,
   };
 }

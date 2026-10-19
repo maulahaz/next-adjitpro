@@ -22,6 +22,7 @@ export async function saveInvestorAction(_prev: ActionState, formData: FormData)
         id: str(formData, "id") || undefined,
         nama: str(formData, "nama"),
         kontak: str(formData, "kontak"),
+        email: str(formData, "email"),
         rekening: str(formData, "rekening"),
         status: str(formData, "status") || undefined,
         tanggalDaftar: str(formData, "tanggalDaftar"),

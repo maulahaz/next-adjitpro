@@ -14,7 +14,8 @@ export function StatementCard({
   statement: InvestorStatementDTO;
   title?: string;
 }) {
-  const { investor, balance, capitalTransactions, fundings, distributions } = statement;
+  const { investor, balance, capitalTransactions, fundings, distributions, fundingSummary } =
+    statement;
 
   const totalLaba = distributions.reduce((s, d) => s + d.jumlahLaba, 0);
   const totalTerpakai = fundings
@@ -36,6 +37,7 @@ export function StatementCard({
       <Card>
         <CardContent className="grid gap-3 pt-4 sm:grid-cols-2 lg:grid-cols-4 sm:pt-6">
           <Info label="Kontak" value={investor.kontak || "-"} />
+          <Info label="Email" value={investor.email || "-"} />
           <Info label="Rekening" value={investor.rekening || "-"} />
           <Info label="Status" value={<StatusPill status={investor.status} />} />
           <Info label="Tanggal Daftar" value={displayDate(investor.tanggalDaftar)} />
@@ -92,30 +94,72 @@ export function StatementCard({
 
       <Card>
         <CardHeader>
-          <CardTitle>Penempatan Modal</CardTitle>
+          <CardTitle>Kontribusi Funding</CardTitle>
         </CardHeader>
         <CardContent className="p-0 sm:p-0">
           <DataTable
             bordered={false}
-            searchPlaceholder="Cari penempatan…"
-            emptyMessage="Belum ada penempatan modal."
+            searchPlaceholder="Cari kontribusi…"
+            emptyMessage="Belum ada kontribusi funding."
             head={
               <TableRow>
-                <TableHead>Proyek</TableHead>
+                <TableHead>Funding</TableHead>
                 <TableHead>Tanggal</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead className="text-right">Jumlah</TableHead>
               </TableRow>
             }
-            searchText={fundings.map((f) => `${f.projectNama} ${f.status} ${displayDate(f.tanggal)}`)}
+            searchText={fundings.map((f) => `${f.fundingNama} ${f.status} ${displayDate(f.tanggal)}`)}
             rows={fundings.map((f) => (
               <TableRow key={f.id}>
-                <TableCell className="font-medium">{f.projectNama}</TableCell>
+                <TableCell className="font-medium">{f.fundingNama}</TableCell>
                 <TableCell>{displayDate(f.tanggal)}</TableCell>
                 <TableCell>
                   <StatusPill status={f.status} />
                 </TableCell>
                 <TableCell className="text-right tabular-nums">{formatRupiah(f.jumlah)}</TableCell>
+              </TableRow>
+            ))}
+          />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Ringkasan Funding</CardTitle>
+        </CardHeader>
+        <CardContent className="p-0 sm:p-0">
+          <DataTable
+            bordered={false}
+            searchPlaceholder="Cari funding…"
+            emptyMessage="Belum ada funding yang Anda ikuti."
+            head={
+              <TableRow>
+                <TableHead>Funding</TableHead>
+                <TableHead>Pihak Ketiga</TableHead>
+                <TableHead className="text-right">Kontribusi Saya</TableHead>
+                <TableHead className="text-right">Laba Saya</TableHead>
+                <TableHead>Proyek</TableHead>
+                <TableHead>Jatuh Tempo</TableHead>
+                <TableHead>Status</TableHead>
+              </TableRow>
+            }
+            searchText={fundingSummary.map((f) => `${f.nama} ${f.pihakKetigaNama} ${f.status}`)}
+            rows={fundingSummary.map((f) => (
+              <TableRow key={f.id}>
+                <TableCell className="font-medium">{f.nama}</TableCell>
+                <TableCell className="text-muted-foreground">{f.pihakKetigaNama || "-"}</TableCell>
+                <TableCell className="text-right tabular-nums">{formatRupiah(f.kontribusiSaya)}</TableCell>
+                <TableCell
+                  className={`text-right tabular-nums ${f.labaSaya < 0 ? "text-destructive" : "text-success"}`}
+                >
+                  {formatRupiah(f.labaSaya)}
+                </TableCell>
+                <TableCell className="text-muted-foreground">{f.jumlahProyek}</TableCell>
+                <TableCell className="text-muted-foreground">{displayDate(f.jatuhTempo)}</TableCell>
+                <TableCell>
+                  <StatusPill status={f.status} />
+                </TableCell>
               </TableRow>
             ))}
           />

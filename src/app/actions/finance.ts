@@ -1,7 +1,8 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { requireWrite } from "@/lib/auth/guard";
+import { requireRoles, requireWrite } from "@/lib/auth/guard";
+import { ROLES } from "@/lib/constants";
 import {
   addCapitalTransaction,
   closeProject,
@@ -18,7 +19,12 @@ function revalidate(projectId?: string) {
   revalidatePath("/distributions");
   revalidatePath("/reports");
   revalidatePath("/projects");
-  if (projectId) revalidatePath(`/projects/${projectId}`);
+  revalidatePath("/my-projects");
+  revalidatePath("/my-card");
+  if (projectId) {
+    revalidatePath(`/projects/${projectId}`);
+    revalidatePath(`/my-projects/${projectId}`);
+  }
 }
 
 /** Tambah mutasi modal — pengganti `apiAddCapital`. */
@@ -69,14 +75,23 @@ export async function distributeProfitAction(_prev: ActionState, formData: FormD
   }
 }
 
-/** Tutup proyek — pengganti `apiCloseProject`. */
+/**
+ * Tutup proyek — pengganti `apiCloseProject`.
+ * Boleh admin/operator maupun client (hanya proyek miliknya). Setelah ditutup,
+ * investor pendana Funding proyek ini menerima notifikasi email.
+ */
 export async function closeProjectAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
   try {
-    const session = await requireWrite();
+    const session = await requireRoles([ROLES.ADMIN, ROLES.OPERATOR, ROLES.CLIENT]);
     const projectId = str(formData, "projectId");
-    await closeProject(projectId, session.username);
+    const scope = session.role === ROLES.CLIENT ? { thirdPartyId: session.thirdPartyId } : undefined;
+    const result = await closeProject(projectId, session.username, scope);
     revalidate(projectId);
-    return ok("Proyek ditutup. Modal dibebaskan untuk proyek berikutnya.");
+    return ok(
+      result.notified > 0
+        ? `Proyek ${result.project} ditutup. Notifikasi email dikirim ke ${result.notified} investor.`
+        : `Proyek ${result.project} ditutup.`,
+    );
   } catch (err) {
     return errorState(err);
   }

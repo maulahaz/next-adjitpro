@@ -12,6 +12,7 @@ import { formatRupiah, toNum, pad, formatPorsi, parseMoneyInput } from "@/lib/do
 import { toDateString, nowStr, todayStr } from "@/lib/domain/dates";
 import { canWrite, hasRole, isAdmin, isClient, rolesReadInternal, rolesWrite } from "@/lib/domain/permissions";
 import { computeLedgerTotals } from "@/lib/domain/ledger-totals";
+import { splitProjectProfit } from "@/lib/domain/funding-split";
 import { legacyHashPassword, verifyPassword } from "@/lib/auth/password";
 
 describe("allocateProRata", () => {
@@ -255,6 +256,79 @@ describe("ringkasan ledger proyek (Debet/Kredit)", () => {
 
   it("daftar kosong -> semua nol", () => {
     expect(computeLedgerTotals([])).toEqual({ debet: 0, kredit: 0, selisih: 0 });
+  });
+});
+
+describe("pembagian laba/rugi Funding (splitProjectProfit)", () => {
+  const items = [
+    { id: "INV-0001", weight: 225_000_000 },
+    { id: "INV-0002", weight: 150_000_000 },
+    { id: "INV-0003", weight: 225_000_000 },
+  ];
+
+  it("laba dibagi sesuai persen agreement, lalu pro-rata kontribusi", () => {
+    const res = splitProjectProfit({
+      laba: 95_000_000,
+      profitInvestorPct: 70,
+      profitClientPct: 30,
+      lossRule: "Proporsional",
+      items,
+    });
+    expect(res.investorPool).toBe(66_500_000);
+    expect(res.clientShare).toBe(28_500_000);
+    const map = Object.fromEntries(res.shares.map((s) => [s.id, s.amount]));
+    expect(map["INV-0001"]).toBe(24_937_500);
+    expect(map["INV-0002"]).toBe(16_625_000);
+    expect(map["INV-0003"]).toBe(24_937_500);
+    expect(res.shares.reduce((s, r) => s + r.amount, 0)).toBe(res.investorPool);
+  });
+
+  it("loss_rule=Investor: seluruh rugi ke investor", () => {
+    const res = splitProjectProfit({
+      laba: -10_000_000,
+      profitInvestorPct: 70,
+      profitClientPct: 30,
+      lossRule: "Investor",
+      items,
+    });
+    expect(res.investorPool).toBe(-10_000_000);
+    expect(res.clientShare).toBe(0);
+  });
+
+  it("loss_rule=Client: seluruh rugi ke client", () => {
+    const res = splitProjectProfit({
+      laba: -10_000_000,
+      profitInvestorPct: 70,
+      profitClientPct: 30,
+      lossRule: "Client",
+      items,
+    });
+    expect(res.investorPool).toBe(0);
+    expect(res.clientShare).toBe(-10_000_000);
+  });
+
+  it("loss_rule=Proporsional: rugi memakai rasio persen yang sama", () => {
+    const res = splitProjectProfit({
+      laba: -10_000_000,
+      profitInvestorPct: 70,
+      profitClientPct: 30,
+      lossRule: "Proporsional",
+      items,
+    });
+    expect(res.investorPool).toBe(-7_000_000);
+    expect(res.clientShare).toBe(-3_000_000);
+  });
+
+  it("agreement kosong (0/0): seluruh laba ke investor", () => {
+    const res = splitProjectProfit({
+      laba: 1_000_000,
+      profitInvestorPct: 0,
+      profitClientPct: 0,
+      lossRule: "Proporsional",
+      items,
+    });
+    expect(res.investorPool).toBe(1_000_000);
+    expect(res.clientShare).toBe(0);
   });
 });
 

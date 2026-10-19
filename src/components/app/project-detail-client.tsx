@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowLeft, CheckCircle2, PieChart, Plus, Trash2 } from "lucide-react";
+import { ArrowLeft, CheckCircle2, ExternalLink, PieChart, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -11,10 +11,8 @@ import { DataTable } from "@/components/app/data-table";
 import { StatusPill, StatCard } from "@/components/app/ui-helpers";
 import { TableCell, TableHead, TableRow } from "@/components/ui/table";
 import {
-  addFundingAction,
   addProjectTransactionAction,
   deleteProjectTransactionAction,
-  removeFundingAction,
 } from "@/app/actions/projects";
 import { closeProjectAction, distributeProfitAction } from "@/app/actions/finance";
 import { formatRupiah, formatPorsi } from "@/lib/domain/money";
@@ -35,7 +33,7 @@ export function ProjectDetailClient({
   /** `false` untuk peran read-only (investor) — menyembunyikan seluruh aksi tulis. */
   canWrite: boolean;
 }) {
-  const { project, totals, fundings, transactions, distributions, ledgers, availableInvestors } = detail;
+  const { project, totals, funding, agreement, contributions, transactions, distributions, ledgers } = detail;
 
   const ledgerTotals = computeLedgerTotals(ledgers);
 
@@ -62,6 +60,7 @@ export function ProjectDetailClient({
           </div>
           <p className="text-sm text-muted-foreground">
             {project.id} · {project.pihakKetigaNama || "tanpa pihak ketiga"} ·{" "}
+            {project.fundingNama ? `Funding: ${project.fundingNama}` : "tanpa funding"} ·{" "}
             {displayDate(project.tanggalMulai)} → {project.tanggalSelesaiAktual || project.tanggalSelesaiRencana || "-"}
           </p>
           {project.catatan ? (
@@ -78,14 +77,14 @@ export function ProjectDetailClient({
                 </Button>
               }
               title="Bagi Hasil Proyek"
-              description="Laba dibagi pro-rata sesuai porsi penempatan modal tiap investor. Proyek akan berstatus Selesai."
+              description="Laba dipecah sesuai persen pada aturan hasil (invest_agreements), lalu dibagi pro-rata ke kontributor Funding. Proyek akan berstatus Selesai."
               action={distributeProfitAction}
               submitLabel="Bagikan Laba"
             >
               <input type="hidden" name="projectId" value={project.id} />
               <div className="rounded-md border bg-muted/40 p-3 text-sm">
                 <div className="flex justify-between">
-                  <span>Modal ditempatkan</span>
+                  <span>Alokasi budget</span>
                   <span className="font-medium">{formatRupiah(totals.modal)}</span>
                 </div>
                 <div className="flex justify-between">
@@ -94,6 +93,14 @@ export function ProjectDetailClient({
                     {formatRupiah(totals.laba)}
                   </span>
                 </div>
+                {agreement ? (
+                  <div className="mt-1 flex justify-between text-muted-foreground">
+                    <span>Porsi investor / client</span>
+                    <span>
+                      {formatPorsi(agreement.profitInvestor)}% / {formatPorsi(agreement.profitClient)}%
+                    </span>
+                  </div>
+                ) : null}
               </div>
               <Field label="Tanggal Bagi Hasil" htmlFor="dist-tanggal">
                 <Input id="dist-tanggal" name="tanggal" type="date" defaultValue={todayStr()} />
@@ -107,7 +114,7 @@ export function ProjectDetailClient({
                 </Button>
               }
               title="Tutup Proyek"
-              description="Mengubah status menjadi Ditutup dan membebaskan seluruh modal yang ditempatkan (kembali idle untuk proyek berikutnya)."
+              description="Mengubah status menjadi Ditutup dan mengirim notifikasi email ke seluruh investor pendana Funding proyek ini."
               action={closeProjectAction}
               submitLabel="Tutup Proyek"
             >
@@ -132,90 +139,71 @@ export function ProjectDetailClient({
         />
       </div>
 
-      {/* Penempatan Modal */}
+      {/* Funding & Kontribusi */}
       <Card>
         <CardHeader>
-          <CardTitle>Penempatan Modal ({fundings.length})</CardTitle>
+          <CardTitle>Funding &amp; Kontribusi</CardTitle>
         </CardHeader>
+        <CardContent className="space-y-4 p-4">
+          {funding ? (
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+              <Info label="Funding" value={funding.nama} />
+              <Info label="Status Funding" value={<StatusPill status={funding.status} />} />
+              <Info label="Target Modal" value={formatRupiah(funding.targetModal)} />
+              <Info label="Jatuh Tempo" value={displayDate(funding.jatuhTempo)} />
+              {agreement ? (
+                <>
+                  <Info label="Porsi Investor" value={`${formatPorsi(agreement.profitInvestor)}%`} />
+                  <Info label="Porsi Client" value={`${formatPorsi(agreement.profitClient)}%`} />
+                  <Info label="Aturan Rugi" value={agreement.lossRule} />
+                </>
+              ) : null}
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">Proyek ini belum ditautkan ke funding.</p>
+          )}
+          {funding && canWrite ? (
+            <Button asChild variant="outline" size="sm">
+              <Link href={`/fundings/${funding.id}`}>
+                <ExternalLink className="h-4 w-4" /> Kelola Funding &amp; Kontribusi
+              </Link>
+            </Button>
+          ) : null}
+        </CardContent>
         <CardContent className="p-0 sm:p-0">
           <DataTable
             bordered={false}
-            toolbar={
-              canEdit ? (
-                <FormDialog
-                  trigger={
-                    <Button size="sm">
-                      <Plus className="h-4 w-4" /> Tempatkan Modal
-                    </Button>
-                  }
-                  title="Tempatkan Modal Investor"
-                  description="Penempatan tidak boleh melebihi saldo idle investor."
-                  action={addFundingAction}
-                >
-                  <input type="hidden" name="projectId" value={project.id} />
-                  <Field label="Investor" htmlFor="f-investor" required>
-                    <SelectInput
-                      id="f-investor"
-                      name="investorId"
-                      required
-                      placeholder="— pilih investor —"
-                      options={availableInvestors.map((i) => ({
-                        value: i.id,
-                        label: `${i.nama} (idle: ${formatRupiah(i.idle)})`,
-                      }))}
-                    />
-                  </Field>
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <Field label="Tanggal" htmlFor="f-tanggal">
-                      <Input id="f-tanggal" name="tanggal" type="date" defaultValue={todayStr()} />
-                    </Field>
-                    <Field label="Jumlah (Rp)" htmlFor="f-jumlah" required>
-                      <Input id="f-jumlah" name="jumlah" type="number" min={1} step={1} required placeholder="0" />
-                    </Field>
-                  </div>
-                </FormDialog>
-              ) : null
-            }
-            searchPlaceholder="Cari penempatan…"
-            emptyMessage="Belum ada penempatan modal pada proyek ini."
+            searchPlaceholder="Cari kontribusi…"
+            emptyMessage="Belum ada kontribusi investor pada funding ini."
             head={
               <TableRow>
                 <TableHead>Investor</TableHead>
                 <TableHead>Tanggal</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead className="text-right">Jumlah</TableHead>
-                {canEdit ? <TableHead className="text-right">Aksi</TableHead> : null}
               </TableRow>
             }
-            searchText={fundings.map((f) => `${f.investorNama} ${f.status} ${displayDate(f.tanggal)}`)}
-            rows={fundings.map((f) => (
-              <TableRow key={f.id}>
-                <TableCell className="font-medium">{f.investorNama}</TableCell>
-                <TableCell>{displayDate(f.tanggal)}</TableCell>
+            searchText={contributions.map((c) => `${c.investorNama} ${c.status} ${displayDate(c.tanggal)}`)}
+            rows={contributions.map((c) => (
+              <TableRow key={c.id}>
+                <TableCell className="font-medium">{c.investorNama}</TableCell>
+                <TableCell>{displayDate(c.tanggal)}</TableCell>
                 <TableCell>
-                  <StatusPill status={f.status} />
+                  <StatusPill status={c.status} />
                 </TableCell>
-                <TableCell className="text-right tabular-nums">{formatRupiah(f.jumlah)}</TableCell>
-                {canEdit ? (
-                  <TableCell>
-                    <div className="flex justify-end">
-                      <ConfirmDialog
-                        trigger={
-                          <Button variant="ghost" size="icon" aria-label="Batalkan" className="text-destructive">
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        }
-                        title="Batalkan Penempatan"
-                        description={`Batalkan penempatan ${formatRupiah(f.jumlah)} dari ${f.investorNama}?`}
-                        action={removeFundingAction}
-                        hidden={{ id: f.id, projectId: project.id }}
-                        confirmLabel="Batalkan"
-                      />
-                    </div>
-                  </TableCell>
-                ) : null}
+                <TableCell className="text-right tabular-nums">{formatRupiah(c.jumlah)}</TableCell>
               </TableRow>
             ))}
+            footer={
+              contributions.length ? (
+                <TableRow>
+                  <TableCell colSpan={3}>Total</TableCell>
+                  <TableCell className="text-right tabular-nums">
+                    {formatRupiah(contributions.reduce((s, c) => s + c.jumlah, 0))}
+                  </TableCell>
+                </TableRow>
+              ) : null
+            }
           />
         </CardContent>
       </Card>
@@ -400,6 +388,15 @@ export function ProjectDetailClient({
           </CardContent>
         </Card>
       ) : null}
+    </div>
+  );
+}
+
+function Info({ label, value }: { label: string; value: React.ReactNode }) {
+  return (
+    <div>
+      <div className="text-xs uppercase tracking-wide text-muted-foreground">{label}</div>
+      <div className="text-sm font-medium">{value}</div>
     </div>
   );
 }

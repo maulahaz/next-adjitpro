@@ -116,25 +116,27 @@ Lihat §2.2 dan §15.
 
 | # | Aturan |
 | --- | --- |
-| BR-1 | **Bagi hasil pro-rata** menurut porsi modal yang ditempatkan di proyek. Rasio = rasio modal; **tanpa fee manajer**. |
+| BR-1 | **Bagi hasil** dipecah dulu memakai persentase `invest_agreements` (porsi investor vs client), lalu bagian investor dibagi **pro-rata** ke kontributor Funding memakai **largest remainder**. **Tanpa fee manajer**. |
 | BR-2 | Pembulatan memakai metode **largest remainder**, sehingga **jumlah seluruh bagian selalu tepat sama dengan laba proyek** (tidak ada rupiah hilang/lebih). |
-| BR-3 | **Rugi dibagi pro-rata** sebagai nilai negatif, dengan aturan pembulatan yang sama. |
-| BR-4 | **Modal pokok berputar.** Yang dibagikan hanya **laba**; pokok tidak dikembalikan. Saat proyek **Ditutup**, seluruh penempatan berubah dari `Aktif` → `Dibebaskan` sehingga modal kembali **idle**. |
+| BR-3 | **Rugi** mengikuti `loss_rule` (`Proporsional`/`Investor`/`Client`) dengan aturan pembulatan yang sama. |
+| BR-4 | **Modal pokok berputar.** Yang dibagikan hanya **laba**; pokok dikembalikan lewat **pengembalian pokok Funding** (`funding_returns`), yang menandai kontribusi `Aktif` → `Dikembalikan` dan Funding menjadi `Lunas` (modal kembali **idle**). |
 | BR-5 | Pembagian laba dibayar **sekaligus di akhir proyek** (bukan bertahap). |
-| BR-6 | **Uang dalam Rupiah bilangan bulat** — tanpa desimal. Porsi disimpan dengan presisi `numeric(9,4)`. |
+| BR-6 | **Uang dalam Rupiah bilangan bulat** — tanpa desimal. Porsi disimpan dengan presisi `numeric(9,4)` (persentase agreement `numeric(5,2)`). |
 | BR-7 | **Penarikan modal** tidak boleh melebihi **saldo idle** investor. |
-| BR-8 | **Penempatan modal** ke proyek tidak boleh melebihi **saldo idle** investor. |
-| BR-9 | Proyek berstatus **`Ditutup` bersifat final** — tidak dapat diubah, ditambah penempatan, atau ditambah transaksi. |
+| BR-8 | **Kontribusi investor ke Funding** tidak boleh melebihi **saldo idle** investor. |
+| BR-9 | Proyek berstatus **`Ditutup` bersifat final** — tidak dapat diubah atau ditambah transaksi. |
 | BR-10 | Proyek berlaba **wajib dibagikan lebih dulu** sebelum dapat ditutup. |
 | BR-11 | Bagi hasil **hanya boleh sekali** per proyek. |
-| BR-12 | Bagi hasil hanya boleh dijalankan bila **modal proyek > 0** dan **laba ≠ 0**. |
-| BR-13 | Proyek yang sudah dibagikan **tidak dapat dihapus**, dan penempatan/transaksinya tidak dapat diubah. |
-| BR-14 | **Saldo idle** = modal pokok − modal terpakai. |
+| BR-12 | Bagi hasil hanya boleh dijalankan bila **alokasi budget proyek > 0**, **laba ≠ 0**, dan Funding sudah punya **kontribusi**. |
+| BR-13 | Proyek **berjalan atau yang sudah punya riwayat keuangan** (transaksi/ledger/bagi hasil) **tidak dapat dihapus**; hanya proyek `Draft` tanpa riwayat yang bisa dihapus. |
+| BR-14 | **Saldo idle** = modal pokok − modal terpakai (terpakai = kontribusi Funding berstatus `Aktif`). |
 | BR-15 | **Ekuitas investor** = modal pokok + laba yang telah diterima. |
 | BR-16 | Investor **tidak dapat dihapus** bila sudah memiliki transaksi (arahkan ke penonaktifan). |
-| BR-17 | Pihak ketiga **tidak dapat dihapus** bila masih dipakai pada proyek. |
+| BR-17 | Pihak ketiga **tidak dapat dihapus** bila masih dipakai pada proyek atau funding. |
 | BR-18 | Format **ID** mempertahankan pola lama (`INV-0001`, `PRJ-0001`, …) dan wajib **unik serta atomik**. |
 | BR-19 | Zona waktu aplikasi **`Asia/Jakarta`**; tanggal `yyyy-MM-dd`, waktu `yyyy-MM-dd HH:mm:ss`. |
+| BR-20 | Setiap **proyek wajib** memiliki `funding_id`; satu Funding dimiliki **satu client** dan dapat membiayai **beberapa proyek**. Funding tidak bisa dihapus bila sudah dipakai proyek atau punya kontribusi. |
+| BR-21 | **Penutupan proyek** (admin/operator/client) menandai `Ditutup` + tanggal selesai aktual, dan mengirim **notifikasi email** ke investor pendana Funding proyek tersebut (mode default `log`). |
 
 ### 5.1 Algoritma pembagian laba (acuan contoh)
 
@@ -158,8 +160,8 @@ Contoh ini menjadi **kasus uji wajib** (lihat §12 dan `tests/domain.test.ts`).
 | --- | --- | --- |
 | `admin` | Pengelola | Semua operasi **+ kelola pengguna** |
 | `operator` | Staf operasional | Semua data (baca & tulis) **kecuali buat/ubah/hapus proyek** (read-only), tanpa kelola pengguna |
-| `investor` | Pemodal | **Read-only**, **hanya data miliknya** (Dashboard ter-scope + Kartu Saya) + **detail proyek yang ia danai** (read-only, tanpa aksi tulis) |
-| `client` | Rekanan/pihak ketiga | Proyek milik pihak ketiganya: **baca** status/periode **dan tulis (buat/ubah/hapus) proyek miliknya** (pihak ketiga otomatis); **tulis (CRUD) Ledger Proyek** miliknya. **Tidak** melihat data keuangan internal (modal, pendapatan, biaya, laba, bagi hasil). |
+| `investor` | Pemodal | **Read-only**, **hanya data miliknya** (Dashboard ter-scope, Kartu Saya + ringkasan Funding, Laporan ter-scope) + **detail proyek yang ia danai** (read-only, tanpa aksi tulis) |
+| `client` | Rekanan/pihak ketiga | Proyek milik pihak ketiganya: **baca** status/periode dan **tulis (buat/ubah/hapus) proyek miliknya** serta **menutup proyek** sendiri (memicu email ke investor); **tulis (CRUD) Ledger Proyek** miliknya. **Tidak** melihat data keuangan internal (modal, pendapatan, biaya, laba, bagi hasil), kecuali nama/target/jatuh tempo Funding miliknya. |
 
 ### 6.1 Daftar otorisasi (port dari `rolesWrite`/`rolesRead`/`rolesAdmin`)
 
@@ -168,18 +170,23 @@ Contoh ini menjadi **kasus uji wajib** (lihat §12 dan `tests/domain.test.ts`).
 - `rolesAdmin` = `[admin]`
 - **Pengecualian (v1.2):** buat/ubah/hapus **proyek** diizinkan untuk `[admin, client]`
   (bukan `rolesWrite`); client hanya untuk proyek miliknya.
+- **Modul Funding** (kolam dana) diizinkan untuk `[admin, operator]`; client &
+  investor hanya membaca bagiannya. **Penutupan proyek** diizinkan untuk
+  `[admin, operator, client]` (client hanya proyek miliknya).
 
 ### 6.2 Matriks menu
 
 | Menu | admin | operator | investor | client |
 | --- | :-: | :-: | :-: | :-: |
 | Dashboard | ✔ | ✔ | ✔ *(data sendiri)* | ✖ |
-| Kartu Saya | ✖ | ✖ | ✔ | ✖ |
-| Proyek Saya | ✖ | ✖ | ✖ | ✔ *(buat/ubah/hapus proyek sendiri + Ledger)* |
+| Kartu Saya | ✖ | ✖ | ✔ *(termasuk ringkasan Funding)* | ✖ |
+| Proyek Saya | ✖ | ✖ | ✖ | ✔ *(buat/ubah/hapus + tutup proyek sendiri + Ledger)* |
 | Ledger Proyek | ✔ *(baca, di detail proyek)* | ✔ *(baca, di detail proyek)* | ✔ *(baca, di detail proyek yang ia danai)* | ✔ *CRUD, proyek sendiri* |
+| Funding (kolam dana) | ✔ *(kelola + kontribusi + aturan hasil + pengembalian)* | ✔ *(idem, tanpa kelola pengguna)* | ✖ *(ringkasan via Laporan/Kartu)* | ✖ |
 | Proyek (daftar internal) | ✔ *(buat/ubah/hapus)* | ✔ *(baca)* | ✖ | ✖ |
 | Detail Proyek | ✔ | ✔ | ✔ *(hanya proyek yang ia danai, read-only)* | ✖ |
-| Investor / Mutasi Modal / Bagi Hasil / Laporan / Pihak Ketiga | ✔ | ✔ | ✖ | ✖ |
+| Investor / Mutasi Modal / Bagi Hasil / Pihak Ketiga | ✔ | ✔ | ✖ | ✖ |
+| Laporan | ✔ | ✔ | ✔ *(ter-scope + ringkasan Funding)* | ✖ |
 | Pengguna | ✔ | ✖ | ✖ | ✖ |
 | Ganti Password | ✔ | ✔ | ✔ | ✔ |
 
@@ -388,6 +395,26 @@ Kode persyaratan dipakai sebagai rujukan uji & pelacakan.
 | FR-UI-PERSEN-03 | Desimal memakai **koma** (gaya Indonesia), konsisten dengan format Rupiah. | Wajib |
 | FR-UI-PERSEN-04 | Berlaku juga pada kolom **Porsi (%)** di **ekspor CSV**. | Wajib |
 
+### 7.18 Funding — kolam dana (`FR-FUND`) — fitur baru
+
+> Model baru penggalangan modal: **Funding** (kolam dana) milik **satu client**
+> menghimpun dana dari **beberapa investor** dan membiayai **beberapa proyek**
+> client tersebut. Menggantikan model lama "investor → proyek" (`project_funding`
+> kini **dorman**).
+
+| ID | Kebutuhan | Prioritas |
+| --- | --- | --- |
+| FR-FUND-01 | Entitas **Funding**: `nama`, `target_modal`, `tanggal_mulai`, `jatuh_tempo`, `status` (`Draft`/`Berjalan`/`Lunas`/`Dibatalkan`), `catatan`, `pihak_ketiga_id` (satu client). Dikelola admin/operator. | Wajib |
+| FR-FUND-02 | **Kontribusi Funding**: penempatan modal investor ke Funding (`jumlah`, `tanggal`, `status` `Aktif`/`Dikembalikan`/`Dibatalkan`, `catatan`). Tidak boleh melebihi saldo idle; mengunci idle (terpakai). | Wajib |
+| FR-FUND-03 | **Aturan bagi hasil** (`invest_agreements`, 1 Funding : 1): `profit_investor`/`profit_client` (persen), `loss_rule` (`Proporsional`/`Investor`/`Client`), `jatuh_tempo`, `principal_term`. | Wajib |
+| FR-FUND-04 | **Pengembalian pokok** (`funding_returns`) dicatat admin/operator; bila total menutup seluruh kontribusi, kontribusi menjadi `Dikembalikan`, Funding menjadi `Lunas`, dan idle investor dilepas. | Wajib |
+| FR-FUND-05 | **Proyek wajib** memilih Funding (`funding_id` NOT NULL) dan dapat mengisi `alokasi_budget` (modal proyek). Funding harus milik pihak ketiga client yang sama. | Wajib |
+| FR-FUND-06 | **Bagi hasil proyek**: laba dipecah sesuai persen agreement (investor vs client); bagian investor dibagi pro-rata ke kontributor Funding (largest remainder); rugi mengikuti `loss_rule`. | Wajib |
+| FR-FUND-07 | **Penutupan proyek** oleh admin/operator/client menandai `Ditutup` dan mengirim **notifikasi email** ke investor pendana (abstraksi `EMAIL_MODE`, default `log`). | Wajib |
+| FR-FUND-08 | **Aturan hapus proyek**: hanya proyek `Draft` tanpa riwayat keuangan (transaksi/ledger/bagi hasil) yang bisa dihapus — menjaga jejak audit. | Wajib |
+| FR-FUND-09 | **Ringkasan Funding** untuk investor: daftar Funding yang ia ikuti beserta kontribusi, laba, jumlah proyek, dan jatuh tempo — tampil di **Laporan** dan **Kartu Saya**. | Wajib |
+| FR-FUND-10 | Investor dapat membuka **detail proyek** yang Funding-nya ia danai (read-only) — lewat kontribusi Funding, bukan penempatan langsung. | Wajib |
+
 ---
 
 ## 8. Aturan validasi & pesan kesalahan
@@ -513,18 +540,22 @@ Kode persyaratan dipakai sebagai rujukan uji & pelacakan.
 | Pengujian | Vitest (uji domain murni + integrasi PostgreSQL) |
 | Hosting | Vercel |
 
-### 10.2 Model data (13 tabel)
+### 10.2 Model data (17 tabel)
 
 | Tabel | Isi |
 | --- | --- |
 | `users` | Akun, peran, tautan investor/pihak ketiga, `hash_algo` (bcrypt \| sha256) |
-| `investors` | Master pemodal |
-| `third_parties` | Master rekanan proyek |
-| `projects` | Master proyek + status + tanggal |
+| `investors` | Master pemodal (+ `email`) |
+| `third_parties` | Master rekanan proyek (+ `email`, `alamat`, `status`) |
+| `fundings` | **Funding / kolam dana** (satu client, target modal, jatuh tempo, status) — fitur baru |
+| `invest_agreements` | **Aturan bagi hasil** sebuah Funding (porsi investor/client, aturan rugi) — fitur baru |
+| `funding_contributions` | **Kontribusi investor** ke Funding (mengunci saldo idle) — fitur baru |
+| `funding_returns` | **Pengembalian pokok** Funding oleh client — fitur baru |
+| `projects` | Master proyek + status + tanggal + **`funding_id` (wajib)** + `alokasi_budget` |
 | `capital_transactions` | Setoran / penarikan modal |
-| `project_funding` | Penempatan modal ke proyek (`Aktif` \| `Dibebaskan`) |
+| `project_funding` | **Dorman** — penempatan modal model lama, tidak dipakai kode (arsip) |
 | `project_transactions` | Pendapatan / biaya proyek |
-| `profit_distributions` | Hasil bagi laba per investor (porsi + jumlah) |
+| `profit_distributions` | Hasil bagi laba per investor (porsi + jumlah, + `funding_id` untuk jejak) |
 | `project_ledgers` | **Ledger proyek** (tanggal, deskripsi, jenis Debet/Kredit, nominal, keterangan) — fitur baru v1.1 |
 | `audit_log` | Jejak audit aktivitas |
 | `sessions` | Sesi login aktif |
@@ -534,11 +565,13 @@ Kode persyaratan dipakai sebagai rujukan uji & pelacakan.
 **Keputusan pemodelan:**
 
 - ID entitas tetap `text` dengan format lama → migrasi & rujukan antar-tabel aman.
-- Kolom uang `bigint` (Rupiah bulat); `porsi` `numeric(9,4)`.
+- Kolom uang `bigint` (Rupiah bulat); `porsi` `numeric(9,4)`; persentase agreement `numeric(5,2)`.
 - Pembuatan ID memakai tabel `counters` (atomik), **menggantikan** pola "max + 1".
 - Tabel `sessions` & `login_attempts` menggantikan `CacheService`.
 - Tabel `project_ledgers` (modul baru, bukan dari Sheets) memakai `serial`
   auto-increment karena tidak terlibat dalam migrasi data lama.
+- Tabel `project_funding` **tetap ada tapi dorman** (tidak ada konversi data); saldo
+  "terpakai" kini bersumber dari `funding_contributions`.
 
 ### 10.3 Struktur folder (ringkas)
 
@@ -568,7 +601,7 @@ src/
 | MIG-01 | Menyediakan alat ekspor CSV dari Google Sheets lama (`legacy/ExportData.gs`). |
 | MIG-02 | Impor CSV ke PostgreSQL bersifat **idempoten** (dapat dijalankan berulang tanpa duplikasi). |
 | MIG-03 | **ID lama dipertahankan** persis; tabel `counters` di-seed dari ID maksimum agar tidak bentrok. |
-| MIG-04 | Status penempatan (`Aktif`/`Dibebaskan`) dan seluruh nilai keuangan dipertahankan apa adanya. |
+| MIG-04 | Status & nilai keuangan dipertahankan apa adanya; karena proyek kini wajib punya Funding, dibuat **Funding legacy otomatis** per pihak ketiga (tanpa konversi `project_funding`). |
 | MIG-05 | Format aneh (tanggal/angka) dinormalisasi ketat; anomali dilaporkan, bukan diabaikan diam-diam. |
 | MIG-06 | Setelah impor, saldo hasil hitung ulang harus **identik** dengan aplikasi lama. |
 | MIG-07 | Aplikasi lama **tidak diubah** (migrasi bersifat read-only terhadap sumber). |
@@ -600,7 +633,11 @@ Rilis dinyatakan memenuhi syarat bila seluruh poin berikut terbukti.
 - [ ] Investor hanya menerima data miliknya; **detail proyek** hanya dapat dibuka untuk proyek yang **ia danai** (read-only, tanpa aksi tulis), proyek lain 404.
 - [ ] Client hanya menerima nama/periode/status proyeknya (tanpa data keuangan internal) dan entri Ledger Proyek miliknya.
 - [ ] Client hanya dapat menulis pada **proyek miliknya** dan **Ledger Proyek** miliknya; investor & operator tidak dapat menambah/mengubah/menghapus proyek (ditolak di server).
-- [ ] Client membuat proyek → tertaut otomatis ke pihak ketiganya (tanpa memilih dropdown).
+- [ ] Client membuat proyek → tertaut otomatis ke pihak ketiganya dan **wajib memilih Funding miliknya**.
+- [ ] Operator mencatat **kontribusi Funding** → saldo idle investor berkurang (terpakai); pengembalian pokok melepas idle dan Funding menjadi `Lunas`.
+- [ ] Bagi hasil proyek memakai persen `invest_agreements`; total bagian investor tepat sama dengan laba (largest remainder).
+- [ ] **Penutupan proyek** menandai `Ditutup` dan memicu notifikasi email (mode `log`) ke investor pendana.
+- [ ] Proyek `Berjalan` atau yang punya riwayat keuangan **tidak dapat dihapus**.
 - [ ] Ekspor CSV tanpa sesi sah **ditolak (401)**.
 - [ ] Terkunci setelah 5 percobaan gagal; akun nonaktif ditolak.
 - [ ] Login memakai hash lama SHA-256 berhasil dan otomatis di-*upgrade* ke bcrypt.
@@ -608,7 +645,7 @@ Rilis dinyatakan memenuhi syarat bila seluruh poin berikut terbukti.
 
 ### 12.4 Kualitas teknis
 
-- [ ] `npm test` lulus seluruhnya (**38 uji**: 25 domain + 13 integrasi).
+- [ ] `npm test` lulus seluruhnya (**44 uji**: 30 domain + 14 integrasi).
 - [ ] `npm run typecheck` bersih.
 - [ ] `npm run build` sukses.
 - [ ] Migrasi data lama menghasilkan saldo identik & ID tidak berubah.

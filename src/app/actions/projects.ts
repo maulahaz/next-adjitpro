@@ -4,11 +4,9 @@ import { revalidatePath } from "next/cache";
 import { requireRoles, requireWrite } from "@/lib/auth/guard";
 import { ROLES } from "@/lib/constants";
 import {
-  addFunding,
   addProjectTransaction,
   deleteProject,
   deleteProjectTransaction,
-  removeFunding,
   saveProject,
 } from "@/lib/services/projects";
 import { errorState, num, ok, str } from "@/lib/actions-util";
@@ -21,6 +19,7 @@ function revalidate(projectId?: string) {
   revalidatePath("/investors");
   revalidatePath("/capital");
   revalidatePath("/my-projects");
+  revalidatePath("/fundings");
   if (projectId) {
     revalidatePath(`/projects/${projectId}`);
     revalidatePath(`/my-projects/${projectId}`);
@@ -31,8 +30,8 @@ function revalidate(projectId?: string) {
  * Simpan proyek — pengganti `apiSaveProject`.
  *
  * Peran yang diizinkan: `admin` dan `client` (operator & investor read-only).
- * Untuk `client`, pihak ketiga dipaksa ke miliknya sendiri dan hanya proyek
- * miliknya yang boleh diubah.
+ * Untuk `client`, pihak ketiga dipaksa ke miliknya sendiri (dan funding harus
+ * miliknya); hanya proyek miliknya yang boleh diubah.
  */
 export async function saveProjectAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
   try {
@@ -44,6 +43,8 @@ export async function saveProjectAction(_prev: ActionState, formData: FormData):
         id: str(formData, "id") || undefined,
         nama: str(formData, "nama"),
         pihakKetigaId: str(formData, "pihakKetigaId"),
+        fundingId: str(formData, "fundingId"),
+        alokasiBudget: num(formData, "alokasiBudget"),
         tanggalMulai: str(formData, "tanggalMulai"),
         tanggalSelesaiRencana: str(formData, "tanggalSelesaiRencana"),
         catatan: str(formData, "catatan"),
@@ -68,39 +69,6 @@ export async function deleteProjectAction(_prev: ActionState, formData: FormData
     await deleteProject(id, session.username, scope);
     revalidate(id);
     return ok("Proyek dihapus.");
-  } catch (err) {
-    return errorState(err);
-  }
-}
-
-/** Tempatkan modal — pengganti `apiAddFunding`. */
-export async function addFundingAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  try {
-    const session = await requireWrite();
-    const projectId = str(formData, "projectId");
-    await addFunding(
-      {
-        projectId,
-        investorId: str(formData, "investorId"),
-        jumlah: num(formData, "jumlah"),
-        tanggal: str(formData, "tanggal"),
-      },
-      session.username,
-    );
-    revalidate(projectId);
-    return ok("Penempatan modal disimpan.");
-  } catch (err) {
-    return errorState(err);
-  }
-}
-
-/** Batalkan penempatan — pengganti `apiRemoveFunding`. */
-export async function removeFundingAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  try {
-    const session = await requireWrite();
-    await removeFunding(str(formData, "id"), session.username);
-    revalidate(str(formData, "projectId"));
-    return ok("Penempatan modal dibatalkan.");
   } catch (err) {
     return errorState(err);
   }

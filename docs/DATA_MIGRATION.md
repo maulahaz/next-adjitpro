@@ -42,6 +42,10 @@ ProjectFunding.csv      ProjectTransactions.csv
 ProfitDistributions.csv AuditLog.csv
 ```
 
+Opsional (bila ada di aplikasi lama Anda): `Fundings.csv`,
+`InvestAgreements.csv`, `FundingContributions.csv`, `FundingReturns.csv` —
+dibaca bila tersedia; bila tidak ada, skrip membuat Funding "legacy" otomatis.
+
 Setiap berkas memakai format CSV UTF-8 (dengan BOM) dan nama kolom **sama persis**
 dengan header sheet, sehingga isinya mudah diperiksa dengan Excel/Notepad.
 
@@ -91,14 +95,20 @@ Impor bersifat **idempoten**: baris dengan ID yang sudah ada akan dilewati
 | Sheet lama | Tabel baru | Catatan |
 | --- | --- | --- |
 | `Users` | `users` | Kolom `Salt` & `PasswordHash` dipindah apa adanya dengan `hash_algo = 'sha256'`. |
-| `Investors` | `investors` | — |
-| `ThirdParties` | `third_parties` | — |
-| `Projects` | `projects` | Tanggal dinormalkan ke `YYYY-MM-DD`. |
+| `Investors` | `investors` | Kolom `Email` ikut dipindahkan bila ada. |
+| `ThirdParties` | `third_parties` | Kolom `Email`, `Alamat`, `Status` ikut dipindahkan bila ada. |
+| `Projects` | `projects` | Tanggal dinormalkan ke `YYYY-MM-DD`. **`funding_id` WAJIB** — diisi dari Funding legacy (lihat di bawah). |
 | `CapitalTransactions` | `capital_transactions` | `Setor`/`Tarik` dipertahankan. |
-| `ProjectFunding` | `project_funding` | Status `Aktif`/`Dibebaskan` dipertahankan (penting untuk saldo). |
+| `ProjectFunding` | `project_funding` | **Dorman/arsip** — tidak lagi dipakai kode. Status `Aktif`/`Dibebaskan` tetap disimpan untuk kelengkapan riwayat. |
 | `ProjectTransactions` | `project_transactions` | `Pendapatan`/`Biaya`. |
 | `ProfitDistributions` | `profit_distributions` | `Porsi` → `numeric(9,4)`, `JumlahLaba` → `bigint`. |
 | `AuditLog` | `audit_log` | Riwayat audit dipindahkan untuk kelengkapan. |
+
+**Funding legacy otomatis.** Karena setiap proyek kini wajib punya `funding_id`,
+skrip membuat satu Funding "legacy" untuk tiap pihak ketiga yang punya proyek
+(`FND-xxxx`, catatan `Funding migrasi otomatis`) dan menautkan proyek-proyeknya.
+Bila CSV `Fundings` tersedia, isinya dipakai apa adanya. Data `project_funding`
+lama **tidak** dikonversi menjadi kontribusi (sesuai keputusan desain).
 
 ### 4.2 Pemetaan kolom
 
@@ -146,6 +156,10 @@ CapitalTransactions -> CT-xxxx
 ProjectFunding      -> PF-xxxx
 ProjectTransactions -> PT-xxxx
 ProfitDistributions -> PD-xxxx
+Fundings            -> FND-xxxx
+FundingContributions-> FNC-xxxx
+FundingReturns      -> FR-xxxx
+InvestAgreements    -> IA-xxxx
 ```
 
 ---
@@ -160,11 +174,11 @@ Lalu periksa:
 
 1. **Login** dengan akun lama (username & password lama) — harus berhasil.
 2. **Dashboard**: total modal pokok, terpakai, idle, dan laba dibagikan masuk akal.
-3. **Investor ▸ Kartu**: mutasi modal, penempatan, dan bagi hasil muncul lengkap.
-4. **Proyek**: status tiap proyek benar (`Draft`/`Berjalan`/`Selesai`/`Ditutup`),
-   penempatan berstatus `Dibebaskan` untuk proyek yang sudah ditutup.
-5. **Bagi Hasil**: riwayat lama tampil dengan porsi (%) dan nominal yang sama.
-6. **Proyek Saya** (login sebagai `client`): hanya proyek milik pihak ketiganya,
+3. **Investor ▸ Kartu**: mutasi modal, kontribusi funding, ringkasan funding, dan bagi hasil muncul lengkap.
+4. **Funding**: setiap proyek tertaut ke Funding legacy (dibuat otomatis saat impor).
+5. **Proyek**: status tiap proyek benar (`Draft`/`Berjalan`/`Selesai`/`Ditutup`).
+6. **Bagi Hasil**: riwayat lama tampil dengan porsi (%) dan nominal yang sama.
+7. **Proyek Saya** (login sebagai `client`): hanya proyek milik pihak ketiganya,
    tanpa angka keuangan.
 
 Verifikasi cepat via SQL:
@@ -172,10 +186,17 @@ Verifikasi cepat via SQL:
 ```sql
 SELECT (SELECT count(*) FROM investors)            AS investors,
        (SELECT count(*) FROM projects)             AS projects,
-       (SELECT count(*) FROM project_funding)      AS funding,
+       (SELECT count(*) FROM fundings)             AS fundings,
+       (SELECT count(*) FROM project_funding)      AS funding_lama,
        (SELECT count(*) FROM capital_transactions) AS capital,
        (SELECT count(*) FROM profit_distributions) AS distribusi,
        (SELECT count(*) FROM users)                AS users;
+```
+
+Pastikan **tidak ada** `projects` dengan `funding_id` kosong:
+
+```sql
+SELECT count(*) FROM projects WHERE funding_id IS NULL;
 ```
 
 Bandingkan dengan jumlah baris sheet asal (baris dari ekspor).

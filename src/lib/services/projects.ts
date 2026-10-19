@@ -1,26 +1,32 @@
 /**
- * Proyek, penempatan modal (funding), dan transaksi proyek.
- * Port dari `Projects.gs`.
+ * Proyek, transaksi proyek, dan keterkaitannya dengan Funding (kolam dana).
+ * Port dari `Projects.gs`, disesuaikan dengan model Funding.
+ *
+ * Setiap proyek WAJIB memiliki `funding_id`. Modal proyek = `alokasi_budget`
+ * yang dialokasikan dari Funding tersebut. Bagi hasil memakai kontribusi
+ * Funding + `invest_agreements` (lihat `finance.ts`).
  */
 
 import { and, asc, eq } from "drizzle-orm";
 import { db, type DbOrTx } from "@/lib/db";
 import {
+  fundingContributions,
+  fundings,
+  investAgreements,
   investors,
   projects,
-  projectFunding,
+  projectLedgers,
   projectTransactions,
   profitDistributions,
   thirdParties,
 } from "@/lib/db/schema";
-import { STATUS, TIPE } from "@/lib/constants";
+import { LOSS_RULE, STATUS, TIPE } from "@/lib/constants";
 import { todayStr, toDateString } from "@/lib/domain/dates";
 import { parseMoneyInput, toNum } from "@/lib/domain/money";
 import { computeProjectTotals } from "@/lib/domain/project-totals";
 import { AppError } from "@/lib/errors";
 import { logAudit } from "./audit";
 import { nextId } from "./ids";
-import { loadBalances } from "./ledger";
 import { listProjectLedgers, type ProjectLedgerDTO } from "./project-ledgers";
 
 /* ============================== TIPE ============================== */
@@ -30,6 +36,9 @@ export interface ProjectDTO {
   nama: string;
   pihakKetigaId: string;
   pihakKetigaNama: string;
+  fundingId: string;
+  fundingNama: string;
+  alokasiBudget: number;
   tanggalMulai: string;
   tanggalSelesaiRencana: string;
   tanggalSelesaiAktual: string;
@@ -46,13 +55,29 @@ export interface ProjectEnrichedDTO extends ProjectDTO {
   sudahDibagikan: boolean;
 }
 
-export interface FundingDTO {
+export interface ContributionDTO {
   id: string;
   investorId: string;
   investorNama: string;
   jumlah: number;
   tanggal: string;
   status: string;
+}
+
+export interface ProjectFundingRefDTO {
+  id: string;
+  nama: string;
+  pihakKetigaNama: string;
+  targetModal: number;
+  totalKontribusi: number;
+  status: string;
+  jatuhTempo: string;
+}
+
+export interface AgreementRefDTO {
+  profitInvestor: number;
+  profitClient: number;
+  lossRule: string;
 }
 
 export interface ProjectTransactionDTO {
@@ -72,38 +97,32 @@ export interface DistributionDTO {
   tanggal: string;
 }
 
-export interface AvailableInvestorDTO {
-  id: string;
-  nama: string;
-  status: string;
-  idle: number;
-  modalPokok: number;
-  terpakai: number;
-}
-
 export interface ProjectDetailDTO {
   project: ProjectDTO;
   totals: ReturnType<typeof computeProjectTotals>;
-  fundings: FundingDTO[];
+  funding: ProjectFundingRefDTO | null;
+  agreement: AgreementRefDTO | null;
+  contributions: ContributionDTO[];
   transactions: ProjectTransactionDTO[];
   distributions: DistributionDTO[];
-  /** Ledger proyek (fitur baru) — read-only untuk admin/operator. */
+  /** Ledger proyek (fitur baru) — diisi oleh peran client. */
   ledgers: ProjectLedgerDTO[];
-  availableInvestors: AvailableInvestorDTO[];
 }
 
 /* ============================ PEMBANTU ============================ */
 
 async function loadProjectContext(tx: DbOrTx) {
-  const [projs, tps, funds, txns, dists] = await Promise.all([
+  const [projs, tps, funds, txns, dists, contribs] = await Promise.all([
     tx.select().from(projects).orderBy(asc(projects.id)),
     tx.select().from(thirdParties),
-    tx.select().from(projectFunding),
+    tx.select().from(fundings),
     tx.select().from(projectTransactions),
     tx.select().from(profitDistributions),
+    tx.select().from(fundingContributions),
   ]);
   const tpMap = new Map(tps.map((t) => [t.id, t.nama]));
-  return { projs, tps, funds, txns, dists, tpMap };
+  const fundMap = new Map(funds.map((f) => [f.id, f]));
+  return { projs, tps, funds, txns, dists, contribs, tpMap, fundMap };
 }
 
 function mapProject(
@@ -111,6 +130,8 @@ function mapProject(
     id: string;
     nama: string;
     pihakKetigaId: string | null;
+    fundingId: string;
+    alokasiBudget: number | null;
     tanggalMulai: string | null;
     tanggalSelesaiRencana: string | null;
     tanggalSelesaiAktual: string | null;
@@ -118,12 +139,16 @@ function mapProject(
     catatan: string;
   },
   tpName: string,
+  fundingNama: string,
 ): ProjectDTO {
   return {
     id: p.id,
     nama: p.nama,
     pihakKetigaId: p.pihakKetigaId ?? "",
     pihakKetigaNama: tpName,
+    fundingId: p.fundingId,
+    fundingNama,
+    alokasiBudget: toNum(p.alokasiBudget),
     tanggalMulai: toDateString(p.tanggalMulai),
     tanggalSelesaiRencana: toDateString(p.tanggalSelesaiRencana),
     tanggalSelesaiAktual: toDateString(p.tanggalSelesaiAktual),
@@ -132,29 +157,39 @@ function mapProject(
   };
 }
 
+/** Modal proyek = alokasi_budget dari Funding (0 bila belum dialokasikan). */
+function modalRows(alokasiBudget: number | null): { jumlah: number }[] {
+  const v = toNum(alokasiBudget);
+  return v > 0 ? [{ jumlah: v }] : [];
+}
+
 /* ============================== PROYEK ============================ */
 
 export async function listProjects(tx: DbOrTx = db): Promise<ProjectDTO[]> {
-  const { projs, tpMap } = await loadProjectContext(tx);
-  return projs.map((p) => mapProject(p, tpMap.get(p.pihakKetigaId ?? "") ?? ""));
+  const { projs, tpMap, fundMap } = await loadProjectContext(tx);
+  return projs.map((p) =>
+    mapProject(p, tpMap.get(p.pihakKetigaId ?? "") ?? "", fundMap.get(p.fundingId)?.nama ?? ""),
+  );
 }
 
 export async function listProjectsEnriched(tx: DbOrTx = db): Promise<ProjectEnrichedDTO[]> {
-  const { projs, funds, txns, dists, tpMap } = await loadProjectContext(tx);
+  const { projs, txns, dists, contribs, tpMap, fundMap } = await loadProjectContext(tx);
 
   return projs.map((p) => {
-    const f = funds.filter((x) => String(x.projectId) === String(p.id));
     const t = txns.filter((x) => String(x.projectId) === String(p.id));
     const d = dists.filter((x) => String(x.projectId) === String(p.id));
-    const totals = computeProjectTotals(f, t, d);
+    const totals = computeProjectTotals(modalRows(p.alokasiBudget), t, d);
+    const jumlahInvestor = new Set(
+      contribs.filter((c) => String(c.fundingId) === String(p.fundingId)).map((c) => c.investorId),
+    ).size;
 
     return {
-      ...mapProject(p, tpMap.get(p.pihakKetigaId ?? "") ?? ""),
+      ...mapProject(p, tpMap.get(p.pihakKetigaId ?? "") ?? "", fundMap.get(p.fundingId)?.nama ?? ""),
       modal: totals.modal,
       pendapatan: totals.pendapatan,
       biaya: totals.biaya,
       laba: totals.laba,
-      jumlahInvestor: totals.jumlahInvestor,
+      jumlahInvestor,
       sudahDibagikan: totals.sudahDibagikan,
     };
   });
@@ -164,15 +199,17 @@ export interface ProjectInput {
   id?: string;
   nama?: string;
   pihakKetigaId?: string;
+  fundingId?: string;
+  alokasiBudget?: number | string;
   tanggalMulai?: string;
   tanggalSelesaiRencana?: string;
   catatan?: string;
 }
 
 /**
- * Batasan akses proyek. Bila `scopeThirdPartyId` diisi (peran client), pembuatan
- * memaksa pihak ketiga milik client tersebut, dan ubah/hapus hanya boleh untuk
- * proyek miliknya.
+ * Batasan akses proyek. Bila `scopeThirdPartyId` diisi (peran client),
+ * pembuatan memaksa pihak ketiga milik client tersebut (dan funding harus
+ * miliknya), dan ubah/hapus hanya boleh untuk proyek miliknya.
  */
 export interface ProjectScope {
   scopeThirdPartyId?: string;
@@ -187,12 +224,25 @@ export async function saveProject(
     throw new AppError("Nama proyek wajib diisi.");
   }
 
+  const fundingId = String(data.fundingId ?? "").trim();
+  if (!fundingId) throw new AppError("Funding wajib dipilih.");
+
+  const funding = await getFundingRow(fundingId);
+  if (!funding) throw new AppError("Funding tidak ditemukan.");
+
   const scopeTp = scope?.scopeThirdPartyId;
-  const pihakKetigaId = scopeTp ?? (data.pihakKetigaId || null);
+  if (scopeTp && funding.pihakKetigaId !== scopeTp) {
+    throw new AppError("Anda tidak memiliki hak akses untuk funding ini.");
+  }
+
+  const pihakKetigaId = scopeTp ?? (data.pihakKetigaId || funding.pihakKetigaId || null);
+  const alokasi = parseMoneyInput(data.alokasiBudget);
 
   const payload = {
     nama: String(data.nama).trim(),
     pihakKetigaId,
+    fundingId,
+    alokasiBudget: alokasi > 0 ? alokasi : null,
     tanggalMulai: toDateString(data.tanggalMulai) || todayStr(),
     tanggalSelesaiRencana: toDateString(data.tanggalSelesaiRencana) || null,
     catatan: data.catatan ?? "",
@@ -200,56 +250,69 @@ export async function saveProject(
 
   if (data.id) {
     const existing = await getProjectRow(data.id);
-    if (scopeTp && (!existing || existing.pihakKetigaId !== scopeTp)) {
+    if (!existing) throw new AppError("Proyek tidak ditemukan.");
+    if (scopeTp && existing.pihakKetigaId !== scopeTp) {
       throw new AppError("Anda tidak memiliki hak akses untuk proyek ini.");
     }
-    if (existing && existing.status === STATUS.PROYEK_DITUTUP) {
+    if (existing.status === STATUS.PROYEK_DITUTUP) {
       throw new AppError("Proyek sudah ditutup dan tidak bisa diubah.");
     }
-    await db.update(projects).set(payload).where(eq(projects.id, data.id));
+    // Proyek Draft yang mulai dialokasikan budget dari funding menjadi Berjalan.
+    const status =
+      existing.status === STATUS.PROYEK_DRAFT && alokasi > 0 ? STATUS.PROYEK_BERJALAN : existing.status;
+    await db.update(projects).set({ ...payload, status }).where(eq(projects.id, data.id));
     await logAudit({ aksi: "UPDATE", sheet: "Projects", recordId: data.id, detail: payload.nama, user: actor });
     const updated = (await getProjectRow(data.id))!;
     const tp = payload.pihakKetigaId ? await getThirdPartyName(payload.pihakKetigaId) : "";
-    return mapProject(updated, tp);
+    return mapProject(updated, tp, funding.nama);
   }
 
   const id = await nextId("Projects");
   const row = {
     id,
     ...payload,
-    status: STATUS.PROYEK_DRAFT,
+    status: alokasi > 0 ? STATUS.PROYEK_BERJALAN : STATUS.PROYEK_DRAFT,
     tanggalSelesaiAktual: null as string | null,
   };
   await db.insert(projects).values(row);
   await logAudit({ aksi: "CREATE", sheet: "Projects", recordId: id, detail: payload.nama, user: actor });
   const tp = payload.pihakKetigaId ? await getThirdPartyName(payload.pihakKetigaId) : "";
-  return mapProject({ ...row, createdAt: new Date() } as never, tp);
+  return mapProject({ ...row, createdAt: new Date() } as never, tp, funding.nama);
 }
 
+/**
+ * Hapus proyek. HANYA boleh bila masih `Draft` dan belum memiliki jejak
+ * keuangan (transaksi, ledger, atau bagi hasil) agar jejak akuntansi utuh.
+ */
 export async function deleteProject(
   id: string,
   actor: string,
   scope?: ProjectScope,
 ): Promise<boolean> {
-  if (scope?.scopeThirdPartyId) {
-    const existing = await getProjectRow(id);
-    if (!existing) throw new AppError("Proyek tidak ditemukan.");
-    if (existing.pihakKetigaId !== scope.scopeThirdPartyId) {
-      throw new AppError("Anda tidak memiliki hak akses untuk proyek ini.");
-    }
+  const existing = await getProjectRow(id);
+  if (!existing) throw new AppError("Proyek tidak ditemukan.");
+  if (scope?.scopeThirdPartyId && existing.pihakKetigaId !== scope.scopeThirdPartyId) {
+    throw new AppError("Anda tidak memiliki hak akses untuk proyek ini.");
   }
 
-  const totals = await computeTotalsFor(id);
-  if (totals.sudahDibagikan) {
-    throw new AppError("Proyek sudah dibagikan hasilnya dan tidak bisa dihapus.");
+  if (existing.status !== STATUS.PROYEK_DRAFT) {
+    throw new AppError(
+      "Proyek yang sudah berjalan atau selesai tidak bisa dihapus agar jejak akuntansi tidak hilang.",
+    );
   }
 
-  await db.transaction(async (tx) => {
-    await tx.delete(projectFunding).where(eq(projectFunding.projectId, id));
-    await tx.delete(projectTransactions).where(eq(projectTransactions.projectId, id));
-    await tx.delete(projects).where(eq(projects.id, id));
-  });
+  const [txn, led, dist] = await Promise.all([
+    db.select({ id: projectTransactions.id }).from(projectTransactions).where(eq(projectTransactions.projectId, id)).limit(1),
+    db.select({ id: projectLedgers.id }).from(projectLedgers).where(eq(projectLedgers.projectId, id)).limit(1),
+    db.select({ id: profitDistributions.id }).from(profitDistributions).where(eq(profitDistributions.projectId, id)).limit(1),
+  ]);
+  if (txn.length || led.length || dist.length) {
+    throw new AppError(
+      "Proyek yang sudah memiliki riwayat keuangan tidak bisa dihapus agar jejak akuntansi tidak hilang.",
+    );
+  }
 
+  await db.delete(projects).where(eq(projects.id, id));
   await logAudit({ aksi: "DELETE", sheet: "Projects", recordId: id, user: actor });
   return true;
 }
@@ -257,18 +320,18 @@ export async function deleteProject(
 /* =========================== PERHITUNGAN ========================== */
 
 export async function computeTotalsFor(projectId: string, tx: DbOrTx = db) {
-  const [funds, txns, dists] = await Promise.all([
-    tx.select().from(projectFunding).where(eq(projectFunding.projectId, projectId)),
+  const [pRows, txns, dists] = await Promise.all([
+    tx.select().from(projects).where(eq(projects.id, projectId)).limit(1),
     tx.select().from(projectTransactions).where(eq(projectTransactions.projectId, projectId)),
     tx.select().from(profitDistributions).where(eq(profitDistributions.projectId, projectId)),
   ]);
-  return computeProjectTotals(funds, txns, dists);
+  return computeProjectTotals(modalRows(pRows[0]?.alokasiBudget ?? 0), txns, dists);
 }
 
 /**
- * Apakah `investorId` turut serta dalam penempatan modal (`project_funding`)
- * proyek ini. Dipakai untuk memberikan akses **read-only** detail proyek kepada
- * investor yang ikut mendanai (investor lain tetap ditolak).
+ * Apakah `investorId` turut berkontribusi pada Funding yang membiayai proyek
+ * ini. Dipakai untuk memberi akses **read-only** detail proyek kepada investor
+ * yang ikut mendanai (investor lain tetap ditolak).
  */
 export async function investorFundsProject(
   projectId: string,
@@ -277,9 +340,10 @@ export async function investorFundsProject(
 ): Promise<boolean> {
   if (!projectId || !investorId) return false;
   const rows = await tx
-    .select({ id: projectFunding.id })
-    .from(projectFunding)
-    .where(and(eq(projectFunding.projectId, projectId), eq(projectFunding.investorId, investorId)))
+    .select({ id: fundingContributions.id })
+    .from(projects)
+    .innerJoin(fundingContributions, eq(fundingContributions.fundingId, projects.fundingId))
+    .where(and(eq(projects.id, projectId), eq(fundingContributions.investorId, investorId)))
     .limit(1);
   return rows.length > 0;
 }
@@ -291,29 +355,52 @@ export async function getProjectDetail(projectId: string): Promise<ProjectDetail
   const tpName = project.pihakKetigaId ? await getThirdPartyName(project.pihakKetigaId) : "";
   const totals = await computeTotalsFor(projectId);
 
-  const [invRows, fundRows, txRows, distRows, balances] = await Promise.all([
+  const [fundRows, agrRows, contribRows, invRows, txRows, distRows] = await Promise.all([
+    db.select().from(fundings).where(eq(fundings.id, project.fundingId)).limit(1),
+    db.select().from(investAgreements).where(eq(investAgreements.fundingId, project.fundingId)).limit(1),
+    db.select().from(fundingContributions).where(eq(fundingContributions.fundingId, project.fundingId)),
     db.select().from(investors).orderBy(asc(investors.id)),
-    db.select().from(projectFunding).where(eq(projectFunding.projectId, projectId)),
     db.select().from(projectTransactions).where(eq(projectTransactions.projectId, projectId)),
     db.select().from(profitDistributions).where(eq(profitDistributions.projectId, projectId)),
-    loadBalances(),
   ]);
   const ledgers = await listProjectLedgers(projectId);
 
   const nameById = new Map(invRows.map((i) => [i.id, i.nama]));
   const investorName = (id: string) => nameById.get(id) ?? "(tidak diketahui)";
+  const fund = fundRows[0];
 
   return {
-    project: mapProject(project, tpName),
+    project: mapProject(project, tpName, fund?.nama ?? ""),
     totals,
-    fundings: fundRows.map((f) => ({
-      id: f.id,
-      investorId: f.investorId,
-      investorNama: investorName(f.investorId),
-      jumlah: toNum(f.jumlah),
-      tanggal: toDateString(f.tanggal),
-      status: f.status || STATUS.FUNDING_AKTIF,
-    })),
+    funding: fund
+      ? {
+          id: fund.id,
+          nama: fund.nama,
+          pihakKetigaNama: tpName,
+          targetModal: toNum(fund.targetModal),
+          totalKontribusi: contribRows.reduce((s, c) => s + toNum(c.jumlah), 0),
+          status: fund.status || STATUS.FUND_DRAFT,
+          jatuhTempo: toDateString(fund.jatuhTempo),
+        }
+      : null,
+    agreement: agrRows[0]
+      ? {
+          profitInvestor: toNum(agrRows[0].profitInvestor),
+          profitClient: toNum(agrRows[0].profitClient),
+          lossRule: agrRows[0].lossRule || LOSS_RULE.PROPORSIONAL,
+        }
+      : null,
+    contributions: contribRows
+      .slice()
+      .sort((a, b) => a.id.localeCompare(b.id))
+      .map((c) => ({
+        id: c.id,
+        investorId: c.investorId,
+        investorNama: investorName(c.investorId),
+        jumlah: toNum(c.jumlah),
+        tanggal: toDateString(c.tanggal),
+        status: c.status || STATUS.CONTRIB_AKTIF,
+      })),
     transactions: txRows.map((t) => ({
       id: t.id,
       tanggal: toDateString(t.tanggal),
@@ -330,80 +417,7 @@ export async function getProjectDetail(projectId: string): Promise<ProjectDetail
       tanggal: toDateString(d.tanggal),
     })),
     ledgers,
-    availableInvestors: invRows.map((i) => {
-      const b = balances.find((x) => String(x.id) === String(i.id));
-      return {
-        id: i.id,
-        nama: i.nama,
-        status: i.status || STATUS.INVESTOR_AKTIF,
-        idle: b?.idle ?? 0,
-        modalPokok: b?.modalPokok ?? 0,
-        terpakai: b?.terpakai ?? 0,
-      };
-    }),
   };
-}
-
-/* ============================== FUNDING =========================== */
-
-export interface FundingInput {
-  projectId?: string;
-  investorId?: string;
-  jumlah?: number | string;
-  tanggal?: string;
-}
-
-export async function addFunding(data: FundingInput, actor: string) {
-  const projectId = data.projectId ?? "";
-  const investorId = data.investorId ?? "";
-  const jumlah = parseMoneyInput(data.jumlah);
-
-  if (!projectId || !investorId) throw new AppError("Proyek dan investor wajib dipilih.");
-  if (jumlah <= 0) throw new AppError("Jumlah penempatan harus lebih dari 0.");
-
-  const project = await getProjectRow(projectId);
-  if (!project) throw new AppError("Proyek tidak ditemukan.");
-  if (project.status === STATUS.PROYEK_DITUTUP) throw new AppError("Proyek sudah ditutup.");
-
-  const balance = (await loadBalances()).find((b) => String(b.id) === String(investorId));
-  if (balance && jumlah > balance.idle) {
-    throw new AppError(
-      `Saldo idle ${balance.nama} tidak cukup. Tersedia: ${balance.idle}.`,
-    );
-  }
-
-  const payload = {
-    id: await nextId("ProjectFunding"),
-    projectId,
-    investorId,
-    jumlah,
-    tanggal: toDateString(data.tanggal) || todayStr(),
-    status: STATUS.FUNDING_AKTIF,
-  };
-  await db.insert(projectFunding).values(payload);
-  await logAudit({ aksi: "CREATE", sheet: "ProjectFunding", recordId: payload.id, detail: String(jumlah), user: actor });
-
-  // Proyek Draft yang sudah didanai menjadi Berjalan.
-  if (project.status === STATUS.PROYEK_DRAFT) {
-    await db.update(projects).set({ status: STATUS.PROYEK_BERJALAN }).where(eq(projects.id, projectId));
-  }
-
-  return payload;
-}
-
-export async function removeFunding(id: string, actor: string): Promise<boolean> {
-  const rows = await db.select().from(projectFunding).where(eq(projectFunding.id, id)).limit(1);
-  const f = rows[0];
-  if (!f) throw new AppError("Penempatan tidak ditemukan.");
-
-  const totals = await computeTotalsFor(f.projectId);
-  if (totals.sudahDibagikan) {
-    throw new AppError("Tidak bisa diubah, proyek sudah dibagikan hasilnya.");
-  }
-
-  await db.delete(projectFunding).where(eq(projectFunding.id, id));
-  await logAudit({ aksi: "DELETE", sheet: "ProjectFunding", recordId: id, user: actor });
-  return true;
 }
 
 /* ======================= TRANSAKSI PROYEK ========================= */
@@ -463,6 +477,11 @@ export async function deleteProjectTransaction(id: string, actor: string): Promi
 
 async function getProjectRow(id: string, tx: DbOrTx = db) {
   const rows = await tx.select().from(projects).where(eq(projects.id, id)).limit(1);
+  return rows[0] ?? null;
+}
+
+async function getFundingRow(id: string, tx: DbOrTx = db) {
+  const rows = await tx.select().from(fundings).where(eq(fundings.id, id)).limit(1);
   return rows[0] ?? null;
 }
 

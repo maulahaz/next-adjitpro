@@ -44,17 +44,19 @@ export function InvestorsClient({ investors }: { investors: InvestorDTO[] }) {
           <TableHead>ID</TableHead>
           <TableHead>Nama</TableHead>
           <TableHead>Kontak</TableHead>
+          <TableHead>Email</TableHead>
           <TableHead>Rekening</TableHead>
           <TableHead>Status</TableHead>
           <TableHead className="text-right">Aksi</TableHead>
         </TableRow>
       }
-      searchText={investors.map((inv) => `${inv.id} ${inv.nama} ${inv.kontak ?? ""} ${inv.rekening ?? ""} ${inv.status}`)}
+      searchText={investors.map((inv) => `${inv.id} ${inv.nama} ${inv.kontak ?? ""} ${inv.email ?? ""} ${inv.rekening ?? ""} ${inv.status}`)}
       rows={investors.map((inv) => (
         <TableRow key={inv.id}>
           <TableCell className="font-mono text-xs">{inv.id}</TableCell>
           <TableCell className="font-medium">{inv.nama}</TableCell>
           <TableCell className="text-muted-foreground">{inv.kontak || "-"}</TableCell>
+          <TableCell className="text-muted-foreground">{inv.email || "-"}</TableCell>
           <TableCell className="text-muted-foreground">{inv.rekening || "-"}</TableCell>
           <TableCell>
             <StatusPill status={inv.status} />
@@ -109,11 +111,14 @@ function InvestorFields({ investor }: { investor?: InvestorDTO }) {
         <Field label="Kontak" htmlFor="inv-kontak">
           <Input id="inv-kontak" name="kontak" defaultValue={investor?.kontak ?? ""} />
         </Field>
-        <Field label="Rekening" htmlFor="inv-rekening">
-          <Input id="inv-rekening" name="rekening" defaultValue={investor?.rekening ?? ""} />
+        <Field label="Email" htmlFor="inv-email">
+          <Input id="inv-email" name="email" type="email" defaultValue={investor?.email ?? ""} placeholder="nama@contoh.com" />
         </Field>
       </div>
       <div className="grid gap-4 sm:grid-cols-2">
+        <Field label="Rekening" htmlFor="inv-rekening">
+          <Input id="inv-rekening" name="rekening" defaultValue={investor?.rekening ?? ""} />
+        </Field>
         <Field label="Status" htmlFor="inv-status">
           <SelectInput
             id="inv-status"
@@ -122,15 +127,15 @@ function InvestorFields({ investor }: { investor?: InvestorDTO }) {
             defaultValue={investor?.status ?? "Aktif"}
           />
         </Field>
-        <Field label="Tanggal Daftar" htmlFor="inv-tanggal">
-          <Input
-            id="inv-tanggal"
-            name="tanggalDaftar"
-            type="date"
-            defaultValue={investor?.tanggalDaftar ?? todayStr()}
-          />
-        </Field>
       </div>
+      <Field label="Tanggal Daftar" htmlFor="inv-tanggal">
+        <Input
+          id="inv-tanggal"
+          name="tanggalDaftar"
+          type="date"
+          defaultValue={investor?.tanggalDaftar ?? todayStr()}
+        />
+      </Field>
       <Field label="Catatan" htmlFor="inv-catatan">
         <Textarea id="inv-catatan" name="catatan" defaultValue={investor?.catatan ?? ""} />
       </Field>

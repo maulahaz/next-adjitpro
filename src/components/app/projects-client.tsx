@@ -16,17 +16,25 @@ import { formatRupiah } from "@/lib/domain/money";
 import { displayDate, todayStr } from "@/lib/domain/dates";
 import type { ProjectEnrichedDTO } from "@/lib/services/projects";
 import type { ThirdPartyDTO } from "@/lib/services/third-parties";
+import type { FundingDTO } from "@/lib/services/fundings";
 
 export function ProjectsClient({
   projects,
   thirdParties,
+  fundings,
   canWrite,
 }: {
   projects: ProjectEnrichedDTO[];
   thirdParties: ThirdPartyDTO[];
+  fundings: FundingDTO[];
   /** Hanya admin yang boleh menambah/ubah/hapus proyek di halaman ini. */
   canWrite: boolean;
 }) {
+  const fundingOptions = fundings.map((f) => ({
+    value: f.id,
+    label: `${f.nama} — ${f.pihakKetigaNama || "tanpa pihak ketiga"}`,
+  }));
+
   return (
     <DataTable
       toolbar={
@@ -40,7 +48,7 @@ export function ProjectsClient({
             title="Tambah Proyek"
             action={saveProjectAction}
           >
-            <ProjectFields thirdParties={thirdParties} />
+            <ProjectFields thirdParties={thirdParties} fundingOptions={fundingOptions} />
           </FormDialog>
         ) : null
       }
@@ -50,6 +58,7 @@ export function ProjectsClient({
         <TableRow>
           <TableHead>Proyek</TableHead>
           <TableHead>Pihak Ketiga</TableHead>
+          <TableHead>Funding</TableHead>
           <TableHead>Periode</TableHead>
           <TableHead>Status</TableHead>
           <TableHead className="text-right">Modal</TableHead>
@@ -57,7 +66,9 @@ export function ProjectsClient({
           <TableHead className="text-right">Aksi</TableHead>
         </TableRow>
       }
-      searchText={projects.map((p) => `${p.nama} ${p.id} ${p.pihakKetigaNama ?? ""} ${p.status}`)}
+      searchText={projects.map(
+        (p) => `${p.nama} ${p.id} ${p.pihakKetigaNama ?? ""} ${p.fundingNama ?? ""} ${p.status}`,
+      )}
       rows={projects.map((p) => (
         <TableRow key={p.id}>
           <TableCell>
@@ -65,6 +76,7 @@ export function ProjectsClient({
             <div className="font-mono text-xs text-muted-foreground">{p.id}</div>
           </TableCell>
           <TableCell className="text-muted-foreground">{p.pihakKetigaNama || "-"}</TableCell>
+          <TableCell className="text-muted-foreground">{p.fundingNama || "-"}</TableCell>
           <TableCell className="text-xs text-muted-foreground">
             {displayDate(p.tanggalMulai)} → {p.tanggalSelesaiAktual || p.tanggalSelesaiRencana || "-"}
           </TableCell>
@@ -100,7 +112,11 @@ export function ProjectsClient({
                     title="Ubah Proyek"
                     action={saveProjectAction}
                   >
-                    <ProjectFields project={p} thirdParties={thirdParties} />
+                    <ProjectFields
+                      project={p}
+                      thirdParties={thirdParties}
+                      fundingOptions={fundingOptions}
+                    />
                   </FormDialog>
                   <ConfirmDialog
                     trigger={
@@ -109,7 +125,7 @@ export function ProjectsClient({
                       </Button>
                     }
                     title="Hapus Proyek"
-                    description={`Hapus proyek ${p.nama}? Penempatan modal dan transaksi terkait juga akan dihapus.`}
+                    description={`Hapus proyek ${p.nama}? Hanya proyek Draft tanpa riwayat keuangan yang bisa dihapus.`}
                     action={deleteProjectAction}
                     hidden={{ id: p.id }}
                   />
@@ -126,9 +142,11 @@ export function ProjectsClient({
 function ProjectFields({
   project,
   thirdParties,
+  fundingOptions,
 }: {
   project?: ProjectEnrichedDTO;
   thirdParties: ThirdPartyDTO[];
+  fundingOptions: { value: string; label: string }[];
 }) {
   return (
     <>
@@ -136,13 +154,34 @@ function ProjectFields({
       <Field label="Nama Proyek" htmlFor="prj-nama" required>
         <Input id="prj-nama" name="nama" defaultValue={project?.nama ?? ""} required />
       </Field>
-      <Field label="Pihak Ketiga" htmlFor="prj-tp">
+      <Field label="Funding" htmlFor="prj-funding" required>
+        <SelectInput
+          id="prj-funding"
+          name="fundingId"
+          required
+          placeholder="— pilih funding —"
+          defaultValue={project?.fundingId ?? ""}
+          options={fundingOptions}
+        />
+      </Field>
+      <Field label="Pihak Ketiga" htmlFor="prj-tp" hint="Kosongkan untuk mengikuti pihak ketiga funding.">
         <SelectInput
           id="prj-tp"
           name="pihakKetigaId"
-          placeholder="(tanpa pihak ketiga)"
+          placeholder="(ikut funding)"
           defaultValue={project?.pihakKetigaId ?? ""}
           options={thirdParties.map((t) => ({ value: t.id, label: t.nama }))}
+        />
+      </Field>
+      <Field label="Alokasi Budget (Rp)" htmlFor="prj-alokasi" hint="Opsional — budget yang dialokasikan dari funding.">
+        <Input
+          id="prj-alokasi"
+          name="alokasiBudget"
+          type="number"
+          min={0}
+          step={1}
+          placeholder="0"
+          defaultValue={project?.alokasiBudget ? String(project.alokasiBudget) : ""}
         />
       </Field>
       <div className="grid gap-4 sm:grid-cols-2">

@@ -86,6 +86,17 @@ function readRecords(dir: string, name: string): Rec[] {
     console.warn(`  ! ${name}.csv tidak ditemukan — dilewati.`);
     return [];
   }
+  return readCsvFile(file);
+}
+
+/** Seperti `readRecords` tetapi tanpa peringatan bila file tidak ada. */
+function readRecordsQuiet(dir: string, name: string): Rec[] {
+  const file = join(dir, `${name}.csv`);
+  if (!existsSync(file)) return [];
+  return readCsvFile(file);
+}
+
+function readCsvFile(file: string): Rec[] {
   const rows = parseCsv(readFileSync(file, "utf8"));
   if (rows.length === 0) return [];
   const headers = rows[0].map((h) => h.trim());
@@ -178,6 +189,10 @@ async function main() {
     users,
     investors,
     thirdParties,
+    fundings,
+    investAgreements,
+    fundingContributions,
+    fundingReturns,
     projects,
     capitalTransactions,
     projectFunding,
@@ -218,6 +233,7 @@ async function main() {
     console.log("Mengosongkan tabel...");
     await sql.unsafe(
       `TRUNCATE TABLE audit_log, sessions, login_attempts, profit_distributions,
+       funding_returns, funding_contributions, invest_agreements, fundings,
        project_transactions, project_ledgers, project_funding, capital_transactions, projects,
        third_parties, investors, users, counters RESTART IDENTITY CASCADE`,
     );
@@ -273,6 +289,7 @@ async function main() {
       id: s(r.ID),
       nama: s(r.Nama),
       kontak: s(r.Kontak),
+      email: s(r.Email),
       rekening: s(r.Rekening),
       status: s(r.Status) || "Aktif",
       tanggalDaftar: toDate(r.TanggalDaftar),
@@ -288,25 +305,132 @@ async function main() {
       id: s(r.ID),
       nama: s(r.Nama),
       kontak: s(r.Kontak),
+      email: s(r.Email),
+      alamat: s(r.Alamat),
+      status: s(r.Status) || "Aktif",
       catatan: s(r.Catatan),
     })).filter((r) => r.id && r.nama),
     "ThirdParties",
   );
 
+  /* --------------------------- FUNDINGS ------------------------ */
+  // Dana kolam (fitur baru). Bila CSV `Fundings` tidak ada, dibuat satu Funding
+  // "legacy" per pihak ketiga (mirror dari backfill migrasi 0003) supaya setiap
+  // proyek tetap punya `funding_id` yang WAJIB.
+  const fundingCsv = readRecordsQuiet(dir, "Fundings");
+  const fundingRows: Record<string, unknown>[] = [];
+  const fundingByThirdParty = new Map<string, string>();
+
+  for (const r of fundingCsv) {
+    const id = s(r.ID);
+    if (!id) continue;
+    const tpId = s(r.PihakKetigaID);
+    fundingRows.push({
+      id,
+      pihakKetigaId: orNull(tpId),
+      nama: s(r.Nama) || `Funding ${id}`,
+      targetModal: toInt(r.TargetModal),
+      tanggalMulai: toDate(r.TanggalMulai) ?? toDate(r.Tanggal),
+      jatuhTempo: toDate(r.JatuhTempo),
+      status: s(r.Status) || "Berjalan",
+      catatan: s(r.Catatan),
+    });
+    fundingByThirdParty.set(tpId, id);
+  }
+
+  let legacySeq = 0;
+  for (const row of fundingRows) {
+    const m = String(row.id).match(/(\d+)\s*$/);
+    if (m) legacySeq = Math.max(legacySeq, Number(m[1]));
+  }
+  const nextLegacyFundingId = () => `FND-${String(++legacySeq).padStart(4, "0")}`;
+
+  const projectThirdParties = new Set<string>();
+  for (const r of data.Projects) projectThirdParties.add(s(r.PihakKetigaID));
+
+  for (const tpId of projectThirdParties) {
+    if (fundingByThirdParty.has(tpId)) continue;
+    const id = nextLegacyFundingId();
+    fundingByThirdParty.set(tpId, id);
+    fundingRows.push({
+      id,
+      pihakKetigaId: orNull(tpId),
+      nama: tpId ? `Legacy - ${tpId}` : "Legacy (tanpa pihak ketiga)",
+      targetModal: 0,
+      tanggalMulai: toDate(new Date().toISOString().slice(0, 10)),
+      jatuhTempo: null,
+      status: "Berjalan",
+      catatan: "Funding migrasi otomatis",
+    });
+  }
+
+  await insertAll(fundings, fundingRows, "Fundings");
+
   /* --------------------------- PROJECTS ------------------------ */
   await insertAll(
     projects,
-    data.Projects.map((r) => ({
-      id: s(r.ID),
-      nama: s(r.Nama),
-      pihakKetigaId: orNull(s(r.PihakKetigaID)),
-      tanggalMulai: toDate(r.TanggalMulai),
-      tanggalSelesaiRencana: toDate(r.TanggalSelesaiRencana),
-      tanggalSelesaiAktual: toDate(r.TanggalSelesaiAktual),
-      status: s(r.Status) || "Draft",
-      catatan: s(r.Catatan),
-    })).filter((r) => r.id && r.nama),
+    data.Projects.map((r) => {
+      const tpId = s(r.PihakKetigaID);
+      return {
+        id: s(r.ID),
+        nama: s(r.Nama),
+        pihakKetigaId: orNull(tpId),
+        fundingId: fundingByThirdParty.get(tpId) ?? "",
+        alokasiBudget: null,
+        tanggalMulai: toDate(r.TanggalMulai),
+        tanggalSelesaiRencana: toDate(r.TanggalSelesaiRencana),
+        tanggalSelesaiAktual: toDate(r.TanggalSelesaiAktual),
+        status: s(r.Status) || "Draft",
+        catatan: s(r.Catatan),
+      };
+    }).filter((r) => r.id && r.nama && r.fundingId),
     "Projects",
+  );
+
+  /* ------------------ INVEST AGREEMENTS (opsional) ------------- */
+  const agreementCsv = readRecordsQuiet(dir, "InvestAgreements");
+  await insertAll(
+    investAgreements,
+    agreementCsv.map((r) => ({
+      id: s(r.ID),
+      fundingId: s(r.FundingID),
+      profitInvestor: String(toNum(r.ProfitInvestor)),
+      profitClient: String(toNum(r.ProfitClient)),
+      lossRule: s(r.LossRule) || "Proporsional",
+      jatuhTempo: toDate(r.JatuhTempo),
+      principalTerm: s(r.PrincipalTerm),
+    })).filter((r) => r.id && r.fundingId),
+    "InvestAgreements",
+  );
+
+  /* --------------- FUNDING CONTRIBUTIONS (opsional) ------------ */
+  const contribCsv = readRecordsQuiet(dir, "FundingContributions");
+  await insertAll(
+    fundingContributions,
+    contribCsv.map((r) => ({
+      id: s(r.ID),
+      fundingId: s(r.FundingID),
+      investorId: s(r.InvestorID),
+      jumlah: toInt(r.Jumlah),
+      tanggal: toDate(r.Tanggal),
+      status: s(r.Status) || "Aktif",
+      catatan: s(r.Catatan),
+    })).filter((r) => r.id && r.fundingId && r.investorId),
+    "FundingContributions",
+  );
+
+  /* ------------------- FUNDING RETURNS (opsional) -------------- */
+  const returnCsv = readRecordsQuiet(dir, "FundingReturns");
+  await insertAll(
+    fundingReturns,
+    returnCsv.map((r) => ({
+      id: s(r.ID),
+      fundingId: s(r.FundingID),
+      tanggal: toDate(r.Tanggal),
+      jumlah: toInt(r.Jumlah),
+      catatan: s(r.Catatan),
+    })).filter((r) => r.id && r.fundingId),
+    "FundingReturns",
   );
 
   /* --------------------- CAPITAL TRANSACTIONS ------------------ */
@@ -388,6 +512,13 @@ async function main() {
     Investors: async () => (await db.select({ id: investors.id }).from(investors)).map((r) => r.id),
     ThirdParties: async () =>
       (await db.select({ id: thirdParties.id }).from(thirdParties)).map((r) => r.id),
+    Fundings: async () => (await db.select({ id: fundings.id }).from(fundings)).map((r) => r.id),
+    InvestAgreements: async () =>
+      (await db.select({ id: investAgreements.id }).from(investAgreements)).map((r) => r.id),
+    FundingContributions: async () =>
+      (await db.select({ id: fundingContributions.id }).from(fundingContributions)).map((r) => r.id),
+    FundingReturns: async () =>
+      (await db.select({ id: fundingReturns.id }).from(fundingReturns)).map((r) => r.id),
     Projects: async () => (await db.select({ id: projects.id }).from(projects)).map((r) => r.id),
     CapitalTransactions: async () =>
       (await db.select({ id: capitalTransactions.id }).from(capitalTransactions)).map((r) => r.id),

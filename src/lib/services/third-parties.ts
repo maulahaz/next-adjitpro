@@ -4,7 +4,8 @@
 
 import { asc, eq } from "drizzle-orm";
 import { db, type DbOrTx } from "@/lib/db";
-import { projects, thirdParties } from "@/lib/db/schema";
+import { fundings, projects, thirdParties } from "@/lib/db/schema";
+import { STATUS } from "@/lib/constants";
 import { AppError } from "@/lib/errors";
 import { logAudit } from "./audit";
 import { nextId } from "./ids";
@@ -13,6 +14,9 @@ export interface ThirdPartyDTO {
   id: string;
   nama: string;
   kontak: string;
+  email: string;
+  alamat: string;
+  status: string;
   catatan: string;
 }
 
@@ -20,18 +24,40 @@ export interface ThirdPartyInput {
   id?: string;
   nama?: string;
   kontak?: string;
+  email?: string;
+  alamat?: string;
+  status?: string;
   catatan?: string;
+}
+
+function mapThirdParty(r: {
+  id: string;
+  nama: string;
+  kontak: string;
+  email: string;
+  alamat: string;
+  status: string;
+  catatan: string;
+}): ThirdPartyDTO {
+  return {
+    id: r.id,
+    nama: r.nama,
+    kontak: r.kontak,
+    email: r.email,
+    alamat: r.alamat,
+    status: r.status || STATUS.INVESTOR_AKTIF,
+    catatan: r.catatan,
+  };
 }
 
 export async function listThirdParties(tx: DbOrTx = db): Promise<ThirdPartyDTO[]> {
   const rows = await tx.select().from(thirdParties).orderBy(asc(thirdParties.id));
-  return rows.map((r) => ({ id: r.id, nama: r.nama, kontak: r.kontak, catatan: r.catatan }));
+  return rows.map(mapThirdParty);
 }
 
 export async function getThirdParty(id: string, tx: DbOrTx = db): Promise<ThirdPartyDTO | null> {
   const rows = await tx.select().from(thirdParties).where(eq(thirdParties.id, id)).limit(1);
-  const r = rows[0];
-  return r ? { id: r.id, nama: r.nama, kontak: r.kontak, catatan: r.catatan } : null;
+  return rows[0] ? mapThirdParty(rows[0]) : null;
 }
 
 export async function saveThirdParty(data: ThirdPartyInput, actor: string): Promise<ThirdPartyDTO> {
@@ -41,6 +67,9 @@ export async function saveThirdParty(data: ThirdPartyInput, actor: string): Prom
   const payload = {
     nama: String(data.nama).trim(),
     kontak: data.kontak ?? "",
+    email: data.email ?? "",
+    alamat: data.alamat ?? "",
+    status: data.status || STATUS.INVESTOR_AKTIF,
     catatan: data.catatan ?? "",
   };
 
@@ -57,14 +86,16 @@ export async function saveThirdParty(data: ThirdPartyInput, actor: string): Prom
 }
 
 export async function deleteThirdParty(id: string, actor: string): Promise<boolean> {
-  const used = await db
-    .select({ id: projects.id })
-    .from(projects)
-    .where(eq(projects.pihakKetigaId, id))
-    .limit(1);
+  const [used, usedFunding] = await Promise.all([
+    db.select({ id: projects.id }).from(projects).where(eq(projects.pihakKetigaId, id)).limit(1),
+    db.select({ id: fundings.id }).from(fundings).where(eq(fundings.pihakKetigaId, id)).limit(1),
+  ]);
 
   if (used.length) {
     throw new AppError("Pihak ketiga tidak bisa dihapus karena dipakai pada proyek.");
+  }
+  if (usedFunding.length) {
+    throw new AppError("Pihak ketiga tidak bisa dihapus karena dipakai pada funding.");
   }
 
   await db.delete(thirdParties).where(eq(thirdParties.id, id));

@@ -4,7 +4,7 @@
 
 import { asc, eq } from "drizzle-orm";
 import { db, type DbOrTx } from "@/lib/db";
-import { capitalTransactions, investors, projectFunding } from "@/lib/db/schema";
+import { capitalTransactions, fundingContributions, investors } from "@/lib/db/schema";
 import { STATUS } from "@/lib/constants";
 import { todayStr, toDateString } from "@/lib/domain/dates";
 import { AppError } from "@/lib/errors";
@@ -15,6 +15,7 @@ export interface InvestorDTO {
   id: string;
   nama: string;
   kontak: string;
+  email: string;
   rekening: string;
   status: string;
   tanggalDaftar: string;
@@ -25,6 +26,7 @@ export interface InvestorInput {
   id?: string;
   nama?: string;
   kontak?: string;
+  email?: string;
   rekening?: string;
   status?: string;
   tanggalDaftar?: string;
@@ -52,6 +54,7 @@ export async function saveInvestor(
   const payload = {
     nama: String(data.nama).trim(),
     kontak: data.kontak ?? "",
+    email: data.email ?? "",
     rekening: data.rekening ?? "",
     status: data.status || STATUS.INVESTOR_AKTIF,
     catatan: data.catatan ?? "",
@@ -78,9 +81,9 @@ export async function deleteInvestor(id: string, actor: string): Promise<boolean
     .where(eq(capitalTransactions.investorId, id))
     .limit(1);
   const usedFunding = await db
-    .select({ id: projectFunding.id })
-    .from(projectFunding)
-    .where(eq(projectFunding.investorId, id))
+    .select({ id: fundingContributions.id })
+    .from(fundingContributions)
+    .where(eq(fundingContributions.investorId, id))
     .limit(1);
 
   if (usedCapital.length || usedFunding.length) {
@@ -98,6 +101,7 @@ function mapInvestor(r: {
   id: string;
   nama: string;
   kontak: string;
+  email: string;
   rekening: string;
   status: string;
   tanggalDaftar: string | null;
@@ -107,6 +111,7 @@ function mapInvestor(r: {
     id: r.id,
     nama: r.nama,
     kontak: r.kontak,
+    email: r.email,
     rekening: r.rekening,
     status: r.status || STATUS.INVESTOR_AKTIF,
     tanggalDaftar: toDateString(r.tanggalDaftar),

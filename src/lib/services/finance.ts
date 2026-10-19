@@ -1,27 +1,30 @@
 /**
  * Mutasi modal investor (Setor/Tarik) dan MESIN BAGI HASIL.
- * Port dari `Finance.gs`.
+ * Port dari `Finance.gs`, disesuaikan dengan model Funding: laba dibagi
+ * memakai `invest_agreements` (persen) dan kontribusi Funding (pro-rata).
  */
 
 import { asc, eq } from "drizzle-orm";
 import { db, type DbOrTx } from "@/lib/db";
 import {
   capitalTransactions,
+  fundingContributions,
+  fundings,
+  investAgreements,
   investors,
   projects,
-  projectFunding,
   profitDistributions,
 } from "@/lib/db/schema";
-import { STATUS, TIPE } from "@/lib/constants";
+import { LOSS_RULE, STATUS, TIPE } from "@/lib/constants";
 import { todayStr, toDateString } from "@/lib/domain/dates";
+import { splitProjectProfit } from "@/lib/domain/funding-split";
 import { parseMoneyInput, toNum } from "@/lib/domain/money";
-import { allocateProRata } from "@/lib/domain/prorata";
-import { aggregateFundingByInvestor } from "@/lib/domain/project-totals";
 import { AppError } from "@/lib/errors";
 import { logAudit } from "./audit";
 import { nextId } from "./ids";
 import { loadBalances } from "./ledger";
 import { computeTotalsFor } from "./projects";
+import { notifyProjectClosed } from "./email";
 
 /* ============================ TIPE DTO ============================ */
 
@@ -89,7 +92,7 @@ export async function addCapitalTransaction(data: CapitalInput, actor: string) {
     const bal = (await loadBalances()).find((b) => String(b.id) === String(data.investorId));
     if (bal && jumlah > bal.idle) {
       throw new AppError(
-        `Tidak bisa tarik ${jumlah}. Saldo idle hanya ${bal.idle} (sebagian modal sedang terpakai di proyek).`,
+        `Tidak bisa tarik ${jumlah}. Saldo idle hanya ${bal.idle} (sebagian modal sedang terpakai di funding).`,
       );
     }
   }
@@ -126,12 +129,30 @@ export async function deleteCapitalTransaction(id: string, actor: string): Promi
 export interface DistributeResult {
   project: string;
   laba: number;
+  /** Bagian laba untuk investor (sebelum dibagi per kontributor). */
+  investorPool: number;
+  /** Bagian laba untuk client. */
+  clientShare: number;
   rincian: { id: string; amount: number }[];
 }
 
+/** Agregasi kontribusi per investor (investor bisa berkontribusi > 1 kali). */
+function aggregateContributions(
+  rows: { investorId: string; jumlah: number }[],
+): { id: string; weight: number }[] {
+  const map = new Map<string, number>();
+  for (const r of rows) {
+    map.set(r.investorId, (map.get(r.investorId) ?? 0) + toNum(r.jumlah));
+  }
+  return [...map.entries()].map(([id, weight]) => ({ id, weight }));
+}
+
 /**
- * Jalankan pembagian laba proyek secara pro-rata sesuai porsi modal.
- * Menulis hasil ke tabel `profit_distributions` dan menandai proyek `Selesai`.
+ * Jalankan pembagian laba proyek:
+ * - laba dipecah sesuai persen `invest_agreements` (investor vs client);
+ * - bagian investor dibagi pro-rata ke kontributor Funding (largest remainder);
+ * - rugi mengikuti `loss_rule`.
+ * Menulis hasil ke `profit_distributions` dan menandai proyek `Selesai`.
  */
 export async function distributeProfit(
   projectId: string,
@@ -140,7 +161,7 @@ export async function distributeProfit(
 ): Promise<DistributeResult> {
   if (!projectId) throw new AppError("Proyek wajib dipilih.");
 
-  return db.transaction(async (tx) => {
+  const result = await db.transaction(async (tx) => {
     const projectRows = await tx.select().from(projects).where(eq(projects.id, projectId)).limit(1);
     const project = projectRows[0];
     if (!project) throw new AppError("Proyek tidak ditemukan.");
@@ -148,32 +169,48 @@ export async function distributeProfit(
 
     const totals = await computeTotalsFor(projectId, tx);
     if (totals.sudahDibagikan) throw new AppError("Proyek ini sudah pernah dibagikan hasilnya.");
-    if (totals.modal <= 0) throw new AppError("Belum ada penempatan modal pada proyek ini.");
+    if (totals.modal <= 0) throw new AppError("Belum ada alokasi budget pada proyek ini.");
     if (totals.laba === 0) {
       throw new AppError("Laba proyek masih nol. Catat pendapatan/biaya terlebih dahulu.");
     }
 
-    const fundings = await tx
+    const contribs = await tx
       .select()
-      .from(projectFunding)
-      .where(eq(projectFunding.projectId, projectId));
+      .from(fundingContributions)
+      .where(eq(fundingContributions.fundingId, project.fundingId));
+    const items = aggregateContributions(
+      contribs.map((c) => ({ investorId: c.investorId, jumlah: toNum(c.jumlah) })),
+    );
+    if (!items.length) {
+      throw new AppError("Funding proyek ini belum memiliki kontribusi investor.");
+    }
 
-    // Agregasi penempatan per investor (investor bisa menempatkan > 1 kali).
-    const byInvestor = aggregateFundingByInvestor(fundings);
-    const items = [...byInvestor.entries()].map(([id, weight]) => ({ id, weight }));
+    const agreeRows = await tx
+      .select()
+      .from(investAgreements)
+      .where(eq(investAgreements.fundingId, project.fundingId))
+      .limit(1);
+    const agreement = agreeRows[0];
+
+    const split = splitProjectProfit({
+      laba: totals.laba,
+      profitInvestorPct: agreement ? toNum(agreement.profitInvestor) : 100,
+      profitClientPct: agreement ? toNum(agreement.profitClient) : 0,
+      lossRule: agreement?.lossRule ?? LOSS_RULE.PROPORSIONAL,
+      items,
+    });
+
     const totalWeight = items.reduce((s, i) => s + i.weight, 0);
-
-    const hasil = allocateProRata(totals.laba, items);
     const tgl = toDateString(tanggal) || todayStr();
-
     const catatan = `Bagi hasil proyek ${project.nama}${totals.laba < 0 ? " (rugi)" : ""}`;
 
-    for (const h of hasil) {
-      const weight = byInvestor.get(h.id) ?? 0;
+    for (const h of split.shares) {
+      const weight = items.find((i) => i.id === h.id)?.weight ?? 0;
       const porsi = totalWeight === 0 ? 0 : (weight / totalWeight) * 100;
       await tx.insert(profitDistributions).values({
         id: await nextId("ProfitDistributions", tx),
         projectId,
+        fundingId: project.fundingId,
         investorId: h.id,
         porsi: String(Math.round(porsi * 10000) / 10000),
         jumlahLaba: h.amount,
@@ -182,27 +219,52 @@ export async function distributeProfit(
       });
     }
 
-    // Tandai proyek selesai dibagi.
     await tx.update(projects).set({ status: STATUS.PROYEK_SELESAI }).where(eq(projects.id, projectId));
 
-    return { project: project.nama, laba: totals.laba, rincian: hasil };
-  }).then(async (result) => {
-    await logAudit({ aksi: "DISTRIBUTE", sheet: "Projects", recordId: projectId, detail: `Laba ${result.laba}`, user: actor });
-    return result;
+    return {
+      project: project.nama,
+      laba: totals.laba,
+      investorPool: split.investorPool,
+      clientShare: split.clientShare,
+      rincian: split.shares,
+    };
   });
+
+  await logAudit({
+    aksi: "DISTRIBUTE",
+    sheet: "Projects",
+    recordId: projectId,
+    detail: `Laba ${result.laba}`,
+    user: actor,
+  });
+  return result;
+}
+
+export interface CloseResult {
+  project: string;
+  /** Jumlah email notifikasi yang terkirim/dicatat. */
+  notified: number;
 }
 
 /**
- * Tutup proyek: bebaskan modal (agar bisa dipakai proyek berikutnya).
- * Wajib dibagikan dulu bila laba != 0.
+ * Tutup proyek: proyek berlaba wajib dibagikan dulu. Setelah ditutup, seluruh
+ * investor pendana Funding proyek ini menerima notifikasi email.
+ * Boleh dilakukan admin/operator maupun client (dengan `scope`).
  */
-export async function closeProject(projectId: string, actor: string): Promise<boolean> {
+export async function closeProject(
+  projectId: string,
+  actor: string,
+  scope?: { thirdPartyId?: string },
+): Promise<CloseResult> {
   if (!projectId) throw new AppError("Proyek wajib dipilih.");
 
-  const projectName = await db.transaction(async (tx) => {
+  const closed = await db.transaction(async (tx) => {
     const projectRows = await tx.select().from(projects).where(eq(projects.id, projectId)).limit(1);
     const project = projectRows[0];
     if (!project) throw new AppError("Proyek tidak ditemukan.");
+    if (scope?.thirdPartyId && project.pihakKetigaId !== scope.thirdPartyId) {
+      throw new AppError("Anda tidak memiliki hak akses untuk proyek ini.");
+    }
     if (project.status === STATUS.PROYEK_DITUTUP) throw new AppError("Proyek sudah ditutup.");
 
     const totals = await computeTotalsFor(projectId, tx);
@@ -211,20 +273,42 @@ export async function closeProject(projectId: string, actor: string): Promise<bo
     }
 
     await tx
-      .update(projectFunding)
-      .set({ status: STATUS.FUNDING_DIBEBASKAN })
-      .where(eq(projectFunding.projectId, projectId));
-
-    await tx
       .update(projects)
       .set({ status: STATUS.PROYEK_DITUTUP, tanggalSelesaiAktual: todayStr() })
       .where(eq(projects.id, projectId));
 
-    return project.nama;
+    return { nama: project.nama, laba: totals.laba, fundingId: project.fundingId };
   });
 
-  await logAudit({ aksi: "CLOSE", sheet: "Projects", recordId: projectId, detail: projectName, user: actor });
-  return true;
+  // Notifikasi email ke investor pendana Funding proyek ini.
+  const fundingRows = await db.select().from(fundings).where(eq(fundings.id, closed.fundingId)).limit(1);
+  const contribs = await db
+    .select()
+    .from(fundingContributions)
+    .where(eq(fundingContributions.fundingId, closed.fundingId));
+  const invRows = await db.select().from(investors);
+  const invMap = new Map(invRows.map((i) => [i.id, i]));
+  const seen = new Set<string>();
+  const recipients = contribs
+    .map((c) => invMap.get(c.investorId))
+    .filter((i): i is NonNullable<typeof i> => Boolean(i))
+    .filter((i) => {
+      if (seen.has(i.id)) return false;
+      seen.add(i.id);
+      return true;
+    })
+    .map((i) => ({ nama: i.nama, email: i.email }));
+
+  const notified = await notifyProjectClosed({
+    projectId,
+    projectNama: closed.nama,
+    fundingNama: fundingRows[0]?.nama ?? "",
+    laba: closed.laba,
+    recipients,
+  });
+
+  await logAudit({ aksi: "CLOSE", sheet: "Projects", recordId: projectId, detail: closed.nama, user: actor });
+  return { project: closed.nama, notified };
 }
 
 /** Daftar semua pembagian laba (opsional difilter per proyek). */

@@ -27,8 +27,5 @@ export default async function ProjectDetailPage({
   }
 
   const write = canWrite(user.role);
-  // Investor (read-only) tidak perlu daftar seluruh investor beserta saldo idle-nya.
-  const view = write ? detail : { ...detail, availableInvestors: [] };
-
-  return <ProjectDetailClient detail={view} canWrite={write} />;
+  return <ProjectDetailClient detail={detail} canWrite={write} />;
 }

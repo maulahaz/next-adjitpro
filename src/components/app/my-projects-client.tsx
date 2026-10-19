@@ -1,25 +1,40 @@
 "use client";
 
 import Link from "next/link";
-import { BookOpen, Pencil, Plus, Trash2 } from "lucide-react";
+import { BookOpen, CheckCircle2, Pencil, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Field } from "@/components/app/field";
+import { Field, SelectInput } from "@/components/app/field";
 import { FormDialog, ConfirmDialog } from "@/components/app/form-dialog";
 import { DataTable } from "@/components/app/data-table";
 import { StatusPill } from "@/components/app/ui-helpers";
 import { TableCell, TableHead, TableRow } from "@/components/ui/table";
 import { saveProjectAction, deleteProjectAction } from "@/app/actions/projects";
+import { closeProjectAction } from "@/app/actions/finance";
+import { formatRupiah } from "@/lib/domain/money";
 import { displayDate, todayStr } from "@/lib/domain/dates";
 import type { ClientProjectDTO } from "@/lib/services/reports";
+import type { FundingDTO } from "@/lib/services/fundings";
 
 /**
  * Daftar proyek milik peran client ("Proyek Saya") + CRUD.
- * Membuat proyek di sini otomatis menautkannya ke pihak ketiga milik client
- * (tidak ada pilihan pihak ketiga); otorisasi ditegakkan di server.
+ * Proyek otomatis tertaut ke pihak ketiga client dan WAJIB memilih Funding
+ * miliknya; client juga menutup proyek yang sudah selesai (memicu email ke
+ * investor). Otorisasi ditegakkan di server.
  */
-export function MyProjectsClient({ projects }: { projects: ClientProjectDTO[] }) {
+export function MyProjectsClient({
+  projects,
+  fundings,
+}: {
+  projects: ClientProjectDTO[];
+  fundings: FundingDTO[];
+}) {
+  const fundingOptions = fundings.map((f) => ({
+    value: f.id,
+    label: `${f.nama} (target: ${formatRupiah(f.targetModal)})`,
+  }));
+
   return (
     <DataTable
       toolbar={
@@ -30,10 +45,10 @@ export function MyProjectsClient({ projects }: { projects: ClientProjectDTO[] })
             </Button>
           }
           title="Tambah Proyek"
-          description="Proyek otomatis tertaut ke pihak ketiga akun Anda."
+          description="Proyek otomatis tertaut ke pihak ketiga akun Anda dan wajib memilih Funding."
           action={saveProjectAction}
         >
-          <ClientProjectFields />
+          <ClientProjectFields fundingOptions={fundingOptions} />
         </FormDialog>
       }
       searchPlaceholder="Cari proyek…"
@@ -42,20 +57,22 @@ export function MyProjectsClient({ projects }: { projects: ClientProjectDTO[] })
         <TableRow>
           <TableHead>ID</TableHead>
           <TableHead>Proyek</TableHead>
-          {/* <TableHead>Pihak Ketiga</TableHead> */}
+          <TableHead>Funding</TableHead>
+          <TableHead className="text-right">Alokasi Budget</TableHead>
           <TableHead>Periode</TableHead>
           <TableHead>Status</TableHead>
           <TableHead className="text-right">Aksi</TableHead>
         </TableRow>
       }
       searchText={projects.map(
-        (p) => `${p.nama} ${p.id} ${p.pihakKetigaNama ?? ""} ${p.status} ${p.catatan ?? ""}`,
+        (p) => `${p.nama} ${p.id} ${p.fundingNama ?? ""} ${p.status} ${p.catatan ?? ""}`,
       )}
       rows={projects.map((p) => (
         <TableRow key={p.id}>
           <TableCell className="font-mono text-xs">{p.id}</TableCell>
           <TableCell className="font-medium">{p.nama}</TableCell>
-          {/* <TableCell className="text-muted-foreground">{p.pihakKetigaNama || "-"}</TableCell> */}
+          <TableCell className="text-muted-foreground">{p.fundingNama || "-"}</TableCell>
+          <TableCell className="text-right tabular-nums">{formatRupiah(p.alokasiBudget)}</TableCell>
           <TableCell className="text-xs text-muted-foreground">
             {displayDate(p.tanggalMulai)} → {p.tanggalSelesaiAktual || p.tanggalSelesaiRencana || "-"}
           </TableCell>
@@ -69,6 +86,21 @@ export function MyProjectsClient({ projects }: { projects: ClientProjectDTO[] })
                   <BookOpen className="h-4 w-4" /> Ledger
                 </Link>
               </Button>
+              {p.status !== "Ditutup" ? (
+                <FormDialog
+                  trigger={
+                    <Button variant="outline" size="sm" title="Tutup proyek">
+                      <CheckCircle2 className="h-4 w-4" /> Tutup
+                    </Button>
+                  }
+                  title="Tutup Proyek"
+                  description="Setelah ditutup, seluruh investor pendana Funding proyek ini akan menerima notifikasi email. Proyek berlaba wajib dibagikan terlebih dahulu."
+                  action={closeProjectAction}
+                  submitLabel="Tutup Proyek"
+                >
+                  <input type="hidden" name="projectId" value={p.id} />
+                </FormDialog>
+              ) : null}
               <FormDialog
                 trigger={
                   <Button variant="ghost" size="icon" aria-label="Ubah">
@@ -78,7 +110,7 @@ export function MyProjectsClient({ projects }: { projects: ClientProjectDTO[] })
                 title="Ubah Proyek"
                 action={saveProjectAction}
               >
-                <ClientProjectFields project={p} />
+                <ClientProjectFields project={p} fundingOptions={fundingOptions} />
               </FormDialog>
               <ConfirmDialog
                 trigger={
@@ -87,7 +119,7 @@ export function MyProjectsClient({ projects }: { projects: ClientProjectDTO[] })
                   </Button>
                 }
                 title="Hapus Proyek"
-                description={`Hapus proyek ${p.nama}? Penempatan modal dan transaksi terkait juga akan dihapus.`}
+                description={`Hapus proyek ${p.nama}? Hanya proyek Draft tanpa riwayat keuangan yang bisa dihapus.`}
                 action={deleteProjectAction}
                 hidden={{ id: p.id }}
               />
@@ -99,12 +131,39 @@ export function MyProjectsClient({ projects }: { projects: ClientProjectDTO[] })
   );
 }
 
-function ClientProjectFields({ project }: { project?: ClientProjectDTO }) {
+function ClientProjectFields({
+  project,
+  fundingOptions,
+}: {
+  project?: ClientProjectDTO;
+  fundingOptions: { value: string; label: string }[];
+}) {
   return (
     <>
       {project ? <input type="hidden" name="id" value={project.id} /> : null}
       <Field label="Nama Proyek" htmlFor="mp-nama" required>
         <Input id="mp-nama" name="nama" defaultValue={project?.nama ?? ""} required />
+      </Field>
+      <Field label="Funding" htmlFor="mp-funding" required>
+        <SelectInput
+          id="mp-funding"
+          name="fundingId"
+          required
+          placeholder="— pilih funding —"
+          defaultValue={project?.fundingId ?? ""}
+          options={fundingOptions}
+        />
+      </Field>
+      <Field label="Alokasi Budget (Rp)" htmlFor="mp-alokasi" hint="Opsional — budget dari funding untuk proyek ini.">
+        <Input
+          id="mp-alokasi"
+          name="alokasiBudget"
+          type="number"
+          min={0}
+          step={1}
+          placeholder="0"
+          defaultValue={project?.alokasiBudget ? String(project.alokasiBudget) : ""}
+        />
       </Field>
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label="Tanggal Mulai" htmlFor="mp-mulai">

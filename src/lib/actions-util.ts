@@ -30,3 +30,12 @@ export function str(fd: FormData, key: string): string {
 export function num(fd: FormData, key: string): number {
   return parseMoneyInput(fd.get(key));
 }
+
+/** Ambil nilai FormData sebagai angka desimal (mis. persen 70,5). */
+export function dec(fd: FormData, key: string): number {
+  const v = fd.get(key);
+  if (v === null || v === undefined) return 0;
+  const raw = String(v).trim().replace(",", ".");
+  const n = Number(raw);
+  return Number.isFinite(n) ? n : 0;
+}

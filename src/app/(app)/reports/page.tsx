@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Download } from "lucide-react";
 import { requireRolesPage } from "@/lib/auth/guard";
-import { getReports } from "@/lib/services/reports";
+import { getReports, getReportsScoped } from "@/lib/services/reports";
 import { formatRupiah, formatPorsi } from "@/lib/domain/money";
 import { displayDate } from "@/lib/domain/dates";
 import { PageHeader, StatCard, StatusPill } from "@/components/app/ui-helpers";
@@ -14,8 +14,9 @@ import { TableCell, TableHead, TableRow } from "@/components/ui/table";
 export const dynamic = "force-dynamic";
 
 export default async function ReportsPage() {
-  await requireRolesPage(["admin", "operator"]);
-  const reports = await getReports();
+  const user = await requireRolesPage(["admin", "operator", "investor"]);
+  const isInvestor = user.role === "investor";
+  const reports = isInvestor ? await getReportsScoped(user) : await getReports();
 
   const totalModal = reports.balances.reduce((s, b) => s + b.modalPokok, 0);
   const totalIdle = reports.balances.reduce((s, b) => s + b.idle, 0);
@@ -23,22 +24,33 @@ export default async function ReportsPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Laporan" description="Rekapitulasi posisi investor, proyek, dan bagi hasil.">
-        <Button asChild variant="outline">
-          <a href="/api/export?type=investors">
-            <Download className="h-4 w-4" /> Export Investor (CSV)
-          </a>
-        </Button>
-        <Button asChild variant="outline">
-          <a href="/api/export?type=projects">
-            <Download className="h-4 w-4" /> Export Proyek (CSV)
-          </a>
-        </Button>
-        <Button asChild variant="outline">
-          <a href="/api/export?type=distributions">
-            <Download className="h-4 w-4" /> Export Bagi Hasil (CSV)
-          </a>
-        </Button>
+      <PageHeader
+        title="Laporan"
+        description={
+          isInvestor
+            ? "Ringkasan funding yang Anda ikuti, proyek, dan bagi hasil Anda."
+            : "Rekapitulasi posisi investor, proyek, dan bagi hasil."
+        }
+      >
+        {isInvestor ? null : (
+          <>
+            <Button asChild variant="outline">
+              <a href="/api/export?type=investors">
+                <Download className="h-4 w-4" /> Export Investor (CSV)
+              </a>
+            </Button>
+            <Button asChild variant="outline">
+              <a href="/api/export?type=projects">
+                <Download className="h-4 w-4" /> Export Proyek (CSV)
+              </a>
+            </Button>
+            <Button asChild variant="outline">
+              <a href="/api/export?type=distributions">
+                <Download className="h-4 w-4" /> Export Bagi Hasil (CSV)
+              </a>
+            </Button>
+          </>
+        )}
         <PrintButton />
       </PageHeader>
 
@@ -47,6 +59,54 @@ export default async function ReportsPage() {
         <StatCard label="Total Idle" value={formatRupiah(totalIdle)} tone="muted" />
         <StatCard label="Total Laba Diterima" value={formatRupiah(totalLaba)} tone="positive" />
       </div>
+
+      {reports.fundingSummary.length ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>Ringkasan Funding</CardTitle>
+          </CardHeader>
+          <CardContent className="p-0 sm:p-0">
+            <DataTable
+              bordered={false}
+              searchPlaceholder="Cari funding…"
+              emptyMessage="Belum ada funding yang Anda ikuti."
+              head={
+                <TableRow>
+                  <TableHead>Funding</TableHead>
+                  <TableHead>Pihak Ketiga</TableHead>
+                  <TableHead className="text-right">Kontribusi Saya</TableHead>
+                  <TableHead className="text-right">Laba Saya</TableHead>
+                  <TableHead>Proyek</TableHead>
+                  <TableHead>Jatuh Tempo</TableHead>
+                  <TableHead>Status</TableHead>
+                </TableRow>
+              }
+              searchText={reports.fundingSummary.map((f) => `${f.nama} ${f.pihakKetigaNama} ${f.status}`)}
+              rows={reports.fundingSummary.map((f) => (
+                <TableRow key={f.id}>
+                  <TableCell className="font-medium">{f.nama}</TableCell>
+                  <TableCell className="text-muted-foreground">{f.pihakKetigaNama || "-"}</TableCell>
+                  <TableCell className="text-right tabular-nums">{formatRupiah(f.kontribusiSaya)}</TableCell>
+                  <TableCell
+                    className={`text-right tabular-nums ${f.labaSaya < 0 ? "text-destructive" : "text-success"}`}
+                  >
+                    {formatRupiah(f.labaSaya)}
+                  </TableCell>
+                  <TableCell className="text-muted-foreground">
+                    {f.proyekList.length
+                      ? f.proyekList.map((p) => p.nama).join(", ")
+                      : "-"}
+                  </TableCell>
+                  <TableCell className="text-muted-foreground">{displayDate(f.jatuhTempo)}</TableCell>
+                  <TableCell>
+                    <StatusPill status={f.status} />
+                  </TableCell>
+                </TableRow>
+              ))}
+            />
+          </CardContent>
+        </Card>
+      ) : null}
 
       <Card>
         <CardHeader>

@@ -63,7 +63,7 @@ export function computeBalances(
       .filter(
         (f) =>
           String(f.investorId) === String(inv.id) &&
-          (f.status || STATUS.FUNDING_AKTIF) === STATUS.FUNDING_AKTIF,
+          (f.status || STATUS.CONTRIB_AKTIF) === STATUS.CONTRIB_AKTIF,
       )
       .reduce((s, f) => s + toNum(f.jumlah), 0);
 
