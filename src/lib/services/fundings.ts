@@ -181,8 +181,9 @@ export async function listFundingOptions(
 
 /**
  * Opsi Funding yang **siap dipakai client** pada form proyek:
- * status `Komplit` DAN aturan bagi hasil (`invest_agreements`) sudah dibuat.
- * Selama belum memenuhi keduanya, nama Funding tidak ditampilkan ke client.
+ * status `Release` (di-set manual Admin/Operator) DAN aturan bagi hasil
+ * (`invest_agreements`) sudah dibuat. Selama belum `Release`, nama Funding
+ * tidak ditampilkan ke client.
  */
 export async function listUsableFundingOptions(
   thirdPartyId?: string,
@@ -192,7 +193,7 @@ export async function listUsableFundingOptions(
   if (!all.length) return [];
   const agrs = await tx.select().from(investAgreements);
   const withAgreement = new Set(agrs.map((a) => a.fundingId));
-  return all.filter((f) => f.status === STATUS.FUND_KOMPLIT && withAgreement.has(f.id));
+  return all.filter((f) => f.status === STATUS.FUND_RELEASE && withAgreement.has(f.id));
 }
 
 export async function getFundingDetail(id: string, tx: DbOrTx = db): Promise<FundingDetailDTO> {
@@ -282,13 +283,24 @@ export async function saveFunding(data: FundingInput, actor: string): Promise<Fu
   const targetModal = parseMoneyInput(data.targetModal);
   if (targetModal < 0) throw new AppError("Target modal tidak boleh negatif.");
 
+  const status = data.status || STATUS.FUND_DRAFT;
+  if (status === STATUS.FUND_RELEASE) {
+    // "Release" hanya boleh dari status Komplit dan bila aturan bagi hasil sudah ada.
+    if (!data.id) {
+      throw new AppError("Funding harus berstatus Komplit dan memiliki aturan bagi hasil sebelum dirilis.");
+    }
+    const cur = await db.select().from(fundings).where(eq(fundings.id, data.id)).limit(1);
+    if (!cur[0]) throw new AppError("Funding tidak ditemukan.");
+    await assertReleasable(data.id, cur[0].status);
+  }
+
   const payload = {
     pihakKetigaId: data.pihakKetigaId,
     nama,
     targetModal,
     tanggalMulai: toDateString(data.tanggalMulai) || todayStr(),
     jatuhTempo: toDateString(data.jatuhTempo) || null,
-    status: data.status || STATUS.FUND_DRAFT,
+    status,
     catatan: data.catatan ?? "",
   };
 
@@ -319,6 +331,25 @@ export async function deleteFunding(id: string, actor: string): Promise<boolean>
   });
   await logAudit({ aksi: "DELETE", sheet: "Fundings", recordId: id, user: actor });
   return true;
+}
+
+/**
+ * Rilis Funding agar bisa dipakai client (**Admin/Operator**). Syarat: status
+ * Funding `Komplit` DAN aturan bagi hasil sudah dibuat. Idempoten bila sudah
+ * `Release`.
+ */
+export async function releaseFunding(id: string, actor: string): Promise<FundingDTO> {
+  const rows = await db.select().from(fundings).where(eq(fundings.id, id)).limit(1);
+  const f = rows[0];
+  if (!f) throw new AppError("Funding tidak ditemukan.");
+
+  if (f.status !== STATUS.FUND_RELEASE) {
+    await assertReleasable(id, f.status);
+    await db.update(fundings).set({ status: STATUS.FUND_RELEASE }).where(eq(fundings.id, id));
+    await logAudit({ aksi: "RELEASE", sheet: "Fundings", recordId: id, detail: f.nama, user: actor });
+  }
+
+  return (await listFundings()).find((x) => x.id === id)!;
 }
 
 /* ============================ KONTRIBUSI ========================== */
@@ -588,6 +619,24 @@ export async function listFundingsForInvestor(investorId: string): Promise<Fundi
 }
 
 /* ============================ INTERNAL ============================ */
+
+/**
+ * Syarat status `Release`: Funding berstatus `Komplit` (atau sudah `Release`)
+ * DAN aturan bagi hasil (`invest_agreements`) sudah dibuat.
+ */
+async function assertReleasable(fundingId: string, status: string): Promise<void> {
+  if (status !== STATUS.FUND_KOMPLIT && status !== STATUS.FUND_RELEASE) {
+    throw new AppError("Funding hanya bisa dirilis bila statusnya Komplit.");
+  }
+  const agr = await db
+    .select({ id: investAgreements.id })
+    .from(investAgreements)
+    .where(eq(investAgreements.fundingId, fundingId))
+    .limit(1);
+  if (!agr.length) {
+    throw new AppError("Funding hanya bisa dirilis bila aturan bagi hasil sudah dibuat.");
+  }
+}
 
 /**
  * Sinkronkan status Draft/Komplit sebuah Funding dengan total kontribusi:

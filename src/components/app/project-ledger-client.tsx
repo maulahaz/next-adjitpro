@@ -51,8 +51,7 @@ export function ProjectLedgerClient({
 
       {readOnly ? (
         <div className="rounded-lg border border-dashed p-3 text-sm text-muted-foreground">
-          Proyek sudah <strong>Ditutup</strong> — Ledger hanya bisa dibaca. Minta Admin membuka
-          kembali proyek bila ada kesalahan input yang perlu diperbaiki.
+          Proyek sudah <strong>Ditutup</strong> — Ledger hanya bisa dibaca. Hubungi Admin untuk info detail.
         </div>
       ) : null}
 

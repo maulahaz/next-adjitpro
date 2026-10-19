@@ -18,7 +18,8 @@ import type { ThirdPartyDTO } from "@/lib/services/third-parties";
 
 const STATUS_OPTIONS = [
   { value: "Draft", label: "Draft" },
-  { value: "Komplit", label: "Komplit (siap dipakai client)" },
+  { value: "Komplit", label: "Komplit (dana tercapai)" },
+  { value: "Release", label: "Release (siap dipakai)" },
   { value: "Berjalan", label: "Berjalan" },
   { value: "Lunas", label: "Lunas" },
   { value: "Dibatalkan", label: "Dibatalkan" },
@@ -43,7 +44,7 @@ export function FundingsClient({
             </Button>
           }
           title="Tambah Funding"
-          description="Kolam dana yang dihimpun dari beberapa investor untuk membiayai proyek satu client."
+          description="Dana yang dihimpun dari beberapa investor untuk client."
           action={saveFundingAction}
         >
           <FundingFields tpOptions={tpOptions} />

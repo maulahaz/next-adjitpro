@@ -33,7 +33,7 @@ export const NAV_ITEMS: NavItem[] = [
   { href: "/capital", label: "Mutasi Modal", roles: ["admin", "operator"], icon: ArrowLeftRight },
   { href: "/distributions", label: "Bagi Hasil", roles: ["admin", "operator"], icon: PieChart },
   { href: "/reports", label: "Laporan", roles: ["admin", "operator", "investor"], icon: FileBarChart },
-  { href: "/third-parties", label: "Pihak Ketiga", roles: ["admin", "operator"], icon: Building2 },
+  { href: "/third-parties", label: "Mitra", roles: ["admin", "operator"], icon: Building2 },
   { href: "/users", label: "Pengguna", roles: ["admin"], icon: ShieldCheck },
   { href: "/password", label: "Ganti Password", roles: ["admin", "operator", "investor", "client"], icon: KeyRound },
 ];

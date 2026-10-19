@@ -24,17 +24,17 @@ export function ThirdPartiesClient({ thirdParties }: { thirdParties: ThirdPartyD
         <FormDialog
           trigger={
             <Button>
-              <Plus className="h-4 w-4" /> Pihak Ketiga Baru
+              <Plus className="h-4 w-4" /> Mitra Baru
             </Button>
           }
-          title="Tambah Pihak Ketiga"
+          title="Tambah Mitra (Pihak Ketiga)"
           action={saveThirdPartyAction}
         >
           <ThirdPartyFields />
         </FormDialog>
       }
-      searchPlaceholder="Cari pihak ketiga…"
-      emptyMessage="Belum ada pihak ketiga."
+      searchPlaceholder="Cari mitra…"
+      emptyMessage="Belum ada mitra."
       head={
         <TableRow>
           <TableHead>ID</TableHead>

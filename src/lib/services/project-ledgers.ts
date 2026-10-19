@@ -85,7 +85,7 @@ export async function saveProjectLedger(
   const project = await assertOwnedProject(projectId, scope.thirdPartyId);
   if (project.status === STATUS.PROYEK_DITUTUP) {
     throw new AppError(
-      "Proyek sudah ditutup. Ledger tidak bisa diubah. Minta Admin membuka kembali proyek untuk koreksi.",
+      "Proyek sudah ditutup. Ledger tidak bisa diubah. Hubungi Admin untuk info detail.",
     );
   }
 

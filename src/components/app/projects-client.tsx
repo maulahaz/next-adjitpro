@@ -192,7 +192,8 @@ function ProjectFields({
       <Field
         label="Alokasi Budget (Rp)"
         htmlFor="prj-alokasi"
-        hint="Estimasi alokasi budget dari funding untuk proyek ini. Wajib diisi."
+        hint=""
+        // hint="Estimasi alokasi budget dari funding untuk proyek ini. Wajib diisi."
         required
       >
         <Input

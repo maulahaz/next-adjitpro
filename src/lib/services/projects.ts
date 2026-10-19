@@ -242,7 +242,7 @@ export async function saveProject(
       throw new AppError("Anda tidak memiliki hak akses untuk proyek ini.");
     }
     if (existing.status === STATUS.PROYEK_DITUTUP) {
-      throw new AppError("Proyek sudah ditutup dan tidak bisa diubah. Minta Admin membuka kembali proyek.");
+      throw new AppError("Proyek sudah ditutup dan tidak bisa diubah. Hubungi Admin untuk info detail.");
     }
   }
 
@@ -250,13 +250,13 @@ export async function saveProject(
     if (funding.pihakKetigaId !== scopeTp) {
       throw new AppError("Anda tidak memiliki hak akses untuk funding ini.");
     }
-    // Client hanya boleh memakai Funding yang sudah siap (Komplit + beraturan
+    // Client hanya boleh memakai Funding yang sudah **Release** (dan beraturan
     // hasil) saat **memilih** Funding. Bila proyek sudah memakai Funding yang
     // sama (yang kini mungkin sudah Berjalan), gating tidak diulang.
     const keepsSameFunding = Boolean(existing && existing.fundingId === fundingId);
     if (!keepsSameFunding) {
-      if (funding.status !== STATUS.FUND_KOMPLIT) {
-        throw new AppError("Funding belum siap dipakai: status Funding harus Komplit.");
+      if (funding.status !== STATUS.FUND_RELEASE) {
+        throw new AppError("Funding belum siap dipakai: status Funding harus Release.");
       }
       const agr = await db
         .select({ id: investAgreements.id })
@@ -558,11 +558,11 @@ async function getThirdPartyName(id: string): Promise<string> {
   return rows[0]?.nama ?? "";
 }
 
-/** Tandai Funding `Komplit` menjadi `Berjalan` karena dananya dipakai proyek. */
+/** Tandai Funding `Komplit`/`Release` menjadi `Berjalan` karena dananya dipakai proyek. */
 async function markFundingBerjalan(fundingId: string): Promise<void> {
   if (!fundingId) return;
   const f = await getFundingRow(fundingId);
-  if (f && f.status === STATUS.FUND_KOMPLIT) {
+  if (f && (f.status === STATUS.FUND_KOMPLIT || f.status === STATUS.FUND_RELEASE)) {
     await db.update(fundings).set({ status: STATUS.FUND_BERJALAN }).where(eq(fundings.id, fundingId));
   }
 }

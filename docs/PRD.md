@@ -137,7 +137,7 @@ Lihat §2.2 dan §15.
 | BR-19 | Zona waktu aplikasi **`Asia/Jakarta`**; tanggal `yyyy-MM-dd`, waktu `yyyy-MM-dd HH:mm:ss`. |
 | BR-20 | Setiap **proyek wajib** memiliki `funding_id`; satu Funding dimiliki **satu client** dan dapat membiayai **beberapa proyek**. Funding tidak bisa dihapus bila sudah dipakai proyek atau punya kontribusi. |
 | BR-21 | **Penutupan proyek** (admin/operator/client) menandai `Ditutup` + tanggal selesai aktual, dan mengirim **notifikasi email** ke investor pendana Funding proyek tersebut (mode default `log`). |
-| BR-22 | **Siklus Funding**: `Draft` → `Komplit` (total kontribusi mencapai target, atau ditetapkan admin/operator) → `Berjalan` (dana dipakai proyek) → `Lunas` (pokok dikembalikan). Client **hanya boleh memilih Funding `Komplit` yang sudah punya aturan bagi hasil**; jumlah porsi investor + client wajib **tepat 100%**. |
+| BR-22 | **Siklus Funding**: `Draft` → `Komplit` (total kontribusi mencapai target, atau ditetapkan admin/operator) → `Release` (di-set manual admin/operator, syarat: status `Komplit` + aturan bagi hasil sudah dibuat) → `Berjalan` (dana dipakai proyek) → `Lunas` (pokok dikembalikan). Client **hanya boleh memilih Funding `Release` yang sudah punya aturan bagi hasil**; jumlah porsi investor + client wajib **tepat 100%**. |
 | BR-23 | **Siklus proyek**: proyek baru berstatus `Draft` dan menjadi `Berjalan` saat **entri Ledger pertama** ditambahkan; `Selesai` setelah bagi hasil; `Ditutup` setelah penutupan. |
 
 ### 5.1 Algoritma pembagian laba (acuan contoh)
@@ -410,7 +410,7 @@ Kode persyaratan dipakai sebagai rujukan uji & pelacakan.
 
 | ID | Kebutuhan | Prioritas |
 | --- | --- | --- |
-| FR-FUND-01 | Entitas **Funding**: `nama`, `target_modal`, `tanggal_mulai`, `jatuh_tempo`, `status` (`Draft`/`Komplit`/`Berjalan`/`Lunas`/`Dibatalkan`), `catatan`, `pihak_ketiga_id` (satu client). Dikelola admin/operator. | Wajib |
+| FR-FUND-01 | Entitas **Funding**: `nama`, `target_modal`, `tanggal_mulai`, `jatuh_tempo`, `status` (`Draft`/`Komplit`/`Release`/`Berjalan`/`Lunas`/`Dibatalkan`), `catatan`, `pihak_ketiga_id` (satu client). Dikelola admin/operator. | Wajib |
 | FR-FUND-02 | **Kontribusi Funding**: penempatan modal investor ke Funding (`jumlah`, `tanggal`, `status` `Aktif`/`Dikembalikan`/`Dibatalkan`, `catatan`). Tidak boleh melebihi saldo idle; mengunci idle (terpakai). | Wajib |
 | FR-FUND-03 | **Aturan bagi hasil** (`invest_agreements`, 1 Funding : 1): `profit_investor`/`profit_client` (persen — **totalnya wajib tepat 100%**), `loss_rule` (`Proporsional`/`Investor`/`Client`), `jatuh_tempo` (**N bulan setelah jatuh tempo Funding**), `principal_term`. | Wajib |
 | FR-FUND-04 | **Pengembalian pokok** (`funding_returns`) dicatat admin/operator; bila total menutup seluruh kontribusi, kontribusi menjadi `Dikembalikan`, Funding menjadi `Lunas`, dan idle investor dilepas. | Wajib |
@@ -420,9 +420,10 @@ Kode persyaratan dipakai sebagai rujukan uji & pelacakan.
 | FR-FUND-08 | **Aturan hapus proyek**: hanya proyek `Draft` tanpa riwayat keuangan (transaksi/ledger/bagi hasil) yang bisa dihapus — menjaga jejak audit. | Wajib |
 | FR-FUND-09 | **Ringkasan Funding** untuk investor: daftar Funding yang ia ikuti beserta kontribusi, laba, jumlah proyek, dan jatuh tempo — tampil di **Laporan** dan **Kartu Saya**. | Wajib |
 | FR-FUND-10 | Investor dapat membuka **detail proyek** yang Funding-nya ia danai (read-only) — lewat kontribusi Funding, bukan penempatan langsung. | Wajib |
-| FR-FUND-11 | Funding otomatis menjadi **`Komplit`** saat total kontribusi mencapai target; saat dananya dipakai proyek menjadi **`Berjalan`**. **Client hanya boleh memilih Funding berstatus `Komplit` yang sudah memiliki aturan bagi hasil** (Funding yang sudah dipakai proyek tetap boleh dipertahankan saat mengubah proyek). | Wajib |
+| FR-FUND-11 | Funding otomatis menjadi **`Komplit`** saat total kontribusi mencapai target; saat dananya dipakai proyek menjadi **`Berjalan`**. **Client hanya boleh memilih Funding berstatus `Release` yang sudah memiliki aturan bagi hasil** (Funding yang sudah dipakai proyek tetap boleh dipertahankan saat mengubah proyek). | Wajib |
 | FR-FUND-12 | Kolom Funding pada **Proyek Saya** menampilkan **nama Funding + total dana terhimpun** `nama (Total: Rp…)`. | Wajib |
 | FR-FUND-13 | Dashboard admin/operator menampilkan **daftar Funding** (dana terhimpun, target, jatuh tempo, status). | Wajib |
+| FR-FUND-14 | **Rilis Funding** (admin/operator): status `Release` hanya dapat di-set bila status saat ini `Komplit` **dan** aturan bagi hasil sudah dibuat; tersedia sebagai opsi status di daftar Funding sekaligus tombol **Rilis Funding** di halaman detail. Status `Berjalan`/`Lunas`/`Dibatalkan` tidak dapat di-set ulang ke `Release`. | Wajib |
 
 ---
 
@@ -642,7 +643,7 @@ Rilis dinyatakan memenuhi syarat bila seluruh poin berikut terbukti.
 - [ ] Investor hanya menerima data miliknya; **detail proyek** hanya dapat dibuka untuk proyek yang **ia danai** (read-only, tanpa aksi tulis), proyek lain 404.
 - [ ] Client hanya menerima nama/periode/status proyeknya (tanpa data keuangan internal) dan entri Ledger Proyek miliknya.
 - [ ] Client hanya dapat menulis pada **proyek miliknya** dan **Ledger Proyek** miliknya; investor & operator tidak dapat menambah/mengubah/menghapus proyek (ditolak di server).
-- [ ] Client membuat proyek → tertaut otomatis ke pihak ketiganya, **wajib mengisi Alokasi Budget**, dan hanya boleh memilih **Funding `Komplit` yang sudah punya aturan bagi hasil**.
+- [ ] Client membuat proyek → tertaut otomatis ke pihak ketiganya, **wajib mengisi Alokasi Budget**, dan hanya boleh memilih **Funding `Release` yang sudah punya aturan bagi hasil**.
 - [ ] Proyek baru berstatus `Draft` → menjadi `Berjalan` saat **entri Ledger pertama** ditambahkan.
 - [ ] Operator mencatat **kontribusi Funding** → saldo idle investor berkurang (terpakai); pengembalian pokok melepas idle dan Funding menjadi `Lunas`.
 - [ ] Bagi hasil proyek memakai persen `invest_agreements` (total wajib **100%**); total bagian investor tepat sama dengan laba (largest remainder).

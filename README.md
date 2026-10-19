@@ -11,14 +11,14 @@
 | **Dashboard** | Total modal, modal terpakai, idle, laba dibagikan, proyek aktif, posisi tiap investor, daftar proyek. Investor hanya melihat data dirinya sendiri. |
 | **Investor** | Master data pemodal (+ **email**), aksi cepat **Setor/Tarik** modal, dan tombol **Kartu** (statement yang dapat dicetak/PDF). |
 | **Pihak Ketiga** | Master data rekanan proyek (**email, alamat, status**). Dipakai untuk menautkan pengguna berperan `client`. |
-| **Funding** | **Kolam dana** milik satu client yang menghimpun dana beberapa investor (**kontribusi**), mengatur **bagi hasil** (persen investor/client + aturan rugi), dan menerima **pengembalian pokok** dari client. Satu Funding membiayai beberapa proyek. Siklus status: `Draft` → `Komplit` → `Berjalan` → `Lunas`. Admin/operator. |
+| **Funding** | **Kolam dana** milik satu client yang menghimpun dana beberapa investor (**kontribusi**), mengatur **bagi hasil** (persen investor/client + aturan rugi), dan menerima **pengembalian pokok** dari client. Satu Funding membiayai beberapa proyek. Siklus status: `Draft` → `Komplit` → `Release` → `Berjalan` → `Lunas`. Admin/operator. |
 | **Proyek** | Master proyek (wajib memilih **Funding** + `alokasi_budget`), transaksi proyek (pendapatan/biaya), **Bagi Hasil**, **Tutup Proyek**. Buat/ubah/hapus proyek dilakukan **admin** (di sini) dan **client** (di Proyek Saya); operator read-only. **Investor** dapat membuka **detail proyek** (read-only, tanpa aksi) untuk proyek yang ia danai. |
 | **Mutasi Modal** | Riwayat setoran/penarikan modal, filter per investor, rekap netto. |
 | **Bagi Hasil** | Riwayat pembagian laba per proyek per investor beserta porsi (%). |
 | **Laporan** | Rekap investor, rekap proyek, riwayat bagi hasil, **export CSV**, dan **cetak**. Investor melihat versi ter-scope + **Ringkasan Funding** yang ia ikuti. |
 | **Pengguna** | Kelola akun (khusus admin): peran, tautan ke investor/pihak ketiga, **reset password ke `pass-123`**, aktif/nonaktif. |
 | **Kartu Saya** | Halaman investor: statement dirinya sendiri + **ringkasan Funding**. |
-| **Proyek Saya** | Halaman client: daftar proyek milik pihak ketiganya (kolom Funding menampilkan **nama + total dana terhimpun**). Client dapat **menambah/mengubah/menghapus proyeknya** (wajib memilih Funding `Komplit` beraturan hasil + wajib mengisi Alokasi Budget), **menutup proyek** yang selesai (memicu notifikasi email ke investor), dan membuka **Buka Ledger** per proyek. Proyek `Ditutup` hanya bisa dibaca. |
+| **Proyek Saya** | Halaman client: daftar proyek milik pihak ketiganya (kolom Funding menampilkan **nama + total dana terhimpun**). Client dapat **menambah/mengubah/menghapus proyeknya** (wajib memilih Funding `Release` beraturan hasil + wajib mengisi Alokasi Budget), **menutup proyek** yang selesai (memicu notifikasi email ke investor), dan membuka **Buka Ledger** per proyek. Proyek `Ditutup` hanya bisa dibaca. |
 | **Ledger Proyek** | Ledger **Debet/Kredit** per proyek. Ditampilkan sebagai tabel **No · Tanggal · Deskripsi · Debet · Kredit · Keterangan** (nilai masuk ke kolom Debet/Kredit sesuai jenis) dengan baris **Total**. **Hanya peran `client`** yang dapat menambah/ubah/menghapus entri — dan hanya untuk proyek milik pihak ketiganya. Peran lain hanya **membaca** (read-only) di detail proyek; Ledger **terkunci** saat proyek `Ditutup` (admin dapat membuka kembali proyek). |
 | **Ganti Password** | Setiap pengguna dapat mengganti password sendiri (wajib tahu password lama). |
 
@@ -46,10 +46,10 @@
 9. **Penghapusan proyek** hanya untuk proyek `Draft` tanpa riwayat keuangan
    (transaksi/ledger/bagi hasil) — menjaga jejak audit.
 10. **Siklus Funding**: `Draft` → `Komplit` (total kontribusi mencapai target, atau ditetapkan
-    admin/operator) → `Berjalan` (dana dipakai proyek) → `Lunas` (pokok dikembalikan). **Client
-    hanya boleh memilih Funding `Komplit` yang sudah punya aturan bagi hasil**; jumlah porsi
-    investor + client wajib **tepat 100%**; jatuh tempo bagi hasil = **N bulan** setelah jatuh
-    tempo Funding.
+    admin/operator) → `Release` (**di-set manual** admin/operator, syarat: status `Komplit` +
+    aturan bagi hasil sudah dibuat) → `Berjalan` (dana dipakai proyek) → `Lunas` (pokok
+    dikembalikan). **Client hanya boleh memilih Funding `Release`**; jumlah porsi investor +
+    client wajib **tepat 100%**; jatuh tempo bagi hasil = **N bulan** setelah jatuh tempo Funding.
 11. **Siklus proyek**: proyek baru berstatus `Draft` dan menjadi `Berjalan` saat **entri Ledger
     pertama** ditambahkan → `Selesai` setelah bagi hasil → `Ditutup` setelah penutupan.
 12. Proyek `Ditutup` **mengunci Ledger** (hanya baca); **admin** dapat **membuka kembali** proyek
@@ -177,11 +177,11 @@ Perbedaan teknis yang disengaja:
   tabel lama `project_funding` **tetap ada tapi dorman** (tanpa konversi data). Bagi hasil
   mengikuti persen `invest_agreements` (wajib total **100%**), pokok dikembalikan lewat
   `funding_returns`, dan **penutupan proyek** mengirim **notifikasi email** (mode `log`).
-  Status Funding: `Draft` → `Komplit` (kontribusi mencapai target) → `Berjalan` (dana dipakai
-  proyek) → `Lunas`. Lihat PRD §7.18.
+  Status Funding: `Draft` → `Komplit` (kontribusi mencapai target) → `Release` (di-set manual
+  admin/operator) → `Berjalan` (dana dipakai proyek) → `Lunas`. Lihat PRD §7.18.
 - **Sebagian kepemilikan proyek diserahkan ke client**: peran `client` dapat
   membuat/mengubah/menghapus proyek **miliknya** (pihak ketiga terisi otomatis, **wajib
-  mengisi Alokasi Budget**, dan **hanya boleh memilih Funding `Komplit` yang sudah beraturan
+  mengisi Alokasi Budget**, dan **hanya boleh memilih Funding `Release` yang sudah beraturan
   bagi hasil**) dan **menutup proyek** lewat menu **Proyek Saya**; admin tetap mengelola semua
   proyek di menu **Proyek** (termasuk **membuka kembali** proyek `Ditutup`), sedangkan operator
   hanya membaca. Penghapusan proyek hanya untuk `Draft` tanpa riwayat keuangan. Proyek baru
@@ -207,7 +207,7 @@ Perbedaan teknis yang disengaja:
 ## 6. Pengujian
 
 ```powershell
-npm test          # 50 uji: 32 logika murni + 18 integrasi PostgreSQL
+npm test          # 51 uji: 32 logika murni + 19 integrasi PostgreSQL
 ```
 
 Uji integrasi otomatis dilewati bila `DATABASE_URL` tidak tersedia, sehingga

@@ -30,6 +30,7 @@ import {
   addContribution,
   getFundingDetail,
   listUsableFundingOptions,
+  releaseFunding,
   saveAgreement,
   saveFunding,
 } from "@/lib/services/fundings";
@@ -62,10 +63,11 @@ async function makeFunding(
   );
 }
 
-/** Funding siap dipakai client: status Komplit + aturan bagi hasil 70/30. */
+/** Funding siap dipakai client: status `Release` (dari `Komplit` + aturan bagi hasil 70/30). */
 async function makeUsableFunding(thirdPartyId: string, nama = "Funding Siap") {
   const f = await makeFunding(thirdPartyId, nama, 0, "Komplit");
   await saveAgreement({ fundingId: f.id, profitInvestor: 70, profitClient: 30 }, "test");
+  await releaseFunding(f.id, "test");
   return f;
 }
 
@@ -339,7 +341,7 @@ describe.skipIf(!hasDb)("integrasi: proyek — scoping client & aturan hapus", (
     const otherTp = await saveThirdParty({ nama: "PT Lain" }, "test");
     const fundingTp = await makeUsableFunding(tp.id, "Funding Klien");
     const fundingOther = await makeFunding(otherTp.id, "Funding Lain", 0, "Komplit");
-    // Komplit tetapi BELUM memiliki aturan bagi hasil -> belum boleh dipakai client.
+    // Komplit tetapi BELUM `Release` (dan belum ada aturan bagi hasil) -> belum boleh dipakai client.
     const fundingNoAgr = await makeFunding(tp.id, "Funding Tanpa Aturan", 0, "Komplit");
     // Masih Draft -> belum boleh dipakai client.
     const fundingDraftFund = await makeFunding(tp.id, "Funding Draft", 0, "Draft");
@@ -370,17 +372,17 @@ describe.skipIf(!hasDb)("integrasi: proyek — scoping client & aturan hapus", (
     expect(updated.nama).toBe("Proyek Klien 2");
     expect(updated.pihakKetigaId).toBe(tp.id);
 
-    // Gating saat MEMILIH Funding baru: Draft ditolak, Komplit tanpa aturan ditolak.
+    // Gating saat MEMILIH Funding baru: Draft ditolak, Komplit (belum Release) ditolak.
     await expect(
       saveProject({ nama: "X", fundingId: fundingDraftFund.id, alokasiBudget: 1000000 }, "client1", {
         scopeThirdPartyId: tp.id,
       }),
-    ).rejects.toThrow(/harus Komplit/);
+    ).rejects.toThrow(/harus Release/);
     await expect(
       saveProject({ nama: "X", fundingId: fundingNoAgr.id, alokasiBudget: 1000000 }, "client1", {
         scopeThirdPartyId: tp.id,
       }),
-    ).rejects.toThrow(/aturan bagi hasil/);
+    ).rejects.toThrow(/harus Release/);
 
     // Client tidak boleh memakai funding milik pihak ketiga lain.
     await expect(
@@ -621,17 +623,52 @@ describe.skipIf(!hasDb)("integrasi: aturan bagi hasil & kesiapan Funding", () =>
     expect(agr.jatuhTempo).toBe("2027-03-31");
   });
 
-  it("opsi Funding siap pakai = Komplit + sudah ada aturan bagi hasil", async () => {
+  it("rilis Funding: wajib status Komplit + aturan bagi hasil", async () => {
+    const tp = await saveThirdParty({ nama: "PT Rilis" }, "test");
+
+    // Belum Komplit -> tidak bisa dirilis.
+    const draftFund = await makeFunding(tp.id, "F Draft", 0, "Draft");
+    await expect(releaseFunding(draftFund.id, "test")).rejects.toThrow(/statusnya Komplit/);
+
+    // Komplit tetapi belum ada aturan bagi hasil -> ditolak.
+    const komplitNoAgr = await makeFunding(tp.id, "F Komplit Tanpa Aturan", 0, "Komplit");
+    await expect(releaseFunding(komplitNoAgr.id, "test")).rejects.toThrow(/aturan bagi hasil/);
+
+    // Komplit + aturan bagi hasil -> berhasil Release, dan idempoten.
+    const siap = await makeFunding(tp.id, "F Siap", 0, "Komplit");
+    await saveAgreement({ fundingId: siap.id, profitInvestor: 50, profitClient: 50 }, "test");
+    expect((await releaseFunding(siap.id, "test")).status).toBe("Release");
+    expect((await releaseFunding(siap.id, "test")).status).toBe("Release");
+
+    // Tidak bisa dibuat langsung berstatus Release lewat saveFunding.
+    await expect(
+      saveFunding(
+        {
+          pihakKetigaId: tp.id,
+          nama: "F Paksa",
+          targetModal: 0,
+          jatuhTempo: "2026-12-31",
+          status: "Release",
+        },
+        "test",
+      ),
+    ).rejects.toThrow(/sebelum dirilis/);
+  });
+
+  it("opsi Funding siap pakai = status Release yang sudah ada aturan bagi hasil", async () => {
     const tp = await saveThirdParty({ nama: "PT Opsi" }, "test");
     const draftFund = await makeFunding(tp.id, "F Draft", 0, "Draft");
     const komplitNoAgr = await makeFunding(tp.id, "F Komplit Tanpa Aturan", 0, "Komplit");
-    const usable = await makeFunding(tp.id, "F Siap", 0, "Komplit");
-    await saveAgreement({ fundingId: usable.id, profitInvestor: 50, profitClient: 50 }, "test");
+    // Komplit + aturan bagi hasil, tetapi BELUM di-Release -> belum muncul di opsi.
+    const komplitAgr = await makeFunding(tp.id, "F Komplit Beraturan", 0, "Komplit");
+    await saveAgreement({ fundingId: komplitAgr.id, profitInvestor: 50, profitClient: 50 }, "test");
+    const usable = await makeUsableFunding(tp.id, "F Siap");
 
     const ids = (await listUsableFundingOptions(tp.id)).map((o) => o.id);
     expect(ids).toContain(usable.id);
     expect(ids).not.toContain(draftFund.id);
     expect(ids).not.toContain(komplitNoAgr.id);
+    expect(ids).not.toContain(komplitAgr.id);
   });
 });
 

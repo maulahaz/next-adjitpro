@@ -2,10 +2,11 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { ArrowLeft, Coins, FileText, Plus, Trash2 } from "lucide-react";
+import { ArrowLeft, Coins, FileText, Plus, Send, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Field, SelectInput } from "@/components/app/field";
 import { FormDialog, ConfirmDialog } from "@/components/app/form-dialog";
@@ -17,8 +18,10 @@ import {
   addFundingReturnAction,
   deleteContributionAction,
   deleteFundingReturnAction,
+  releaseFundingAction,
   saveAgreementAction,
 } from "@/app/actions/fundings";
+import { STATUS } from "@/lib/constants";
 import { formatPorsi, formatRupiah } from "@/lib/domain/money";
 import { addMonths, displayDate, monthsBetween, todayStr } from "@/lib/domain/dates";
 import type { FundingDetailDTO, InvestAgreementDTO } from "@/lib/services/fundings";
@@ -45,6 +48,10 @@ export function FundingDetailClient({
 
   const investorOptions = investors.map((i) => ({ value: i.id, label: i.nama }));
 
+  // Kesiapan rilis: status harus Komplit dan aturan bagi hasil sudah dibuat.
+  const isReleased = funding.status === STATUS.FUND_RELEASE;
+  const canRelease = funding.status === STATUS.FUND_KOMPLIT && Boolean(agreement);
+
   return (
     <div className="space-y-6">
       <div>
@@ -65,8 +72,39 @@ export function FundingDetailClient({
             {funding.id} · {funding.pihakKetigaNama || "tanpa pihak ketiga"} · Mulai{" "}
             {displayDate(funding.tanggalMulai)} · Jatuh tempo {displayDate(funding.jatuhTempo)}
           </p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            {isReleased
+              ? "Sudah dirilis — client dapat memilih Funding ini untuk proyek baru."
+              : canRelease
+                ? "Siap dirilis: status Komplit ✓ · aturan bagi hasil ✓"
+                : funding.status === STATUS.FUND_KOMPLIT
+                  ? "Belum siap dirilis: aturan bagi hasil belum dibuat."
+                  : "Belum siap dirilis: status Funding harus Komplit."}
+          </p>
           {funding.catatan ? (
             <p className="mt-1 max-w-2xl text-sm text-muted-foreground">{funding.catatan}</p>
+          ) : null}
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          {isReleased ? <Badge variant="secondary">Sudah dirilis</Badge> : null}
+          {canRelease ? (
+            <FormDialog
+              trigger={
+                <Button>
+                  <Send className="h-4 w-4" /> Rilis Funding
+                </Button>
+              }
+              title="Rilis Funding"
+              description="Rilis Funding agar client dapat memilihnya untuk proyek baru. Pastikan status sudah Komplit dan aturan bagi hasil sudah benar."
+              action={releaseFundingAction}
+              submitLabel="Rilis Funding"
+            >
+              <input type="hidden" name="id" value={funding.id} />
+              <p className="text-sm text-muted-foreground">
+                Status Funding akan berubah menjadi <strong>Release</strong> (siap dipakai client).
+              </p>
+            </FormDialog>
           ) : null}
         </div>
       </div>

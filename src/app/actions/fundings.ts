@@ -8,6 +8,7 @@ import {
   deleteContribution,
   deleteFunding,
   deleteFundingReturn,
+  releaseFunding,
   saveAgreement,
   saveFunding,
 } from "@/lib/services/fundings";
@@ -44,6 +45,22 @@ export async function saveFundingAction(_prev: ActionState, formData: FormData):
     );
     revalidate(saved.id);
     return ok("Funding disimpan.");
+  } catch (err) {
+    return errorState(err);
+  }
+}
+
+/**
+ * Rilis Funding agar bisa dipakai client — **Admin/Operator**. Syarat: status
+ * `Komplit` dan aturan bagi hasil sudah dibuat.
+ */
+export async function releaseFundingAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  try {
+    const session = await requireWrite();
+    const fundingId = str(formData, "id");
+    await releaseFunding(fundingId, session.username);
+    revalidate(fundingId);
+    return ok("Funding dirilis. Client sekarang dapat memilihnya untuk proyek baru.");
   } catch (err) {
     return errorState(err);
   }

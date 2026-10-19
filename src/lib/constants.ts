@@ -41,6 +41,7 @@ export const STATUS = {
   /** Siklus hidup Funding (kolam dana). */
   FUND_DRAFT: "Draft",
   FUND_KOMPLIT: "Komplit",
+  FUND_RELEASE: "Release",
   FUND_BERJALAN: "Berjalan",
   FUND_LUNAS: "Lunas",
   FUND_DIBATALKAN: "Dibatalkan",
@@ -126,7 +127,7 @@ export const CAPITAL_TIPES = ["Setor", "Tarik"] as const;
 export const PROJECT_TIPES = ["Pendapatan", "Biaya"] as const;
 export const LEDGER_TIPES = ["Debet", "Kredit"] as const;
 /** Siklus hidup kolam dana (tabel `fundings`). */
-export const FUNDING_STATUSES = ["Draft", "Komplit", "Berjalan", "Lunas", "Dibatalkan"] as const;
+export const FUNDING_STATUSES = ["Draft", "Komplit", "Release", "Berjalan", "Lunas", "Dibatalkan"] as const;
 export const CONTRIB_STATUSES = ["Aktif", "Dikembalikan", "Dibatalkan"] as const;
 export const LOSS_RULES = [LOSS_RULE.PROPORSIONAL, LOSS_RULE.INVESTOR, LOSS_RULE.CLIENT] as const;
 export const ROLE_VALUES = ["admin", "operator", "investor", "client"] as const;

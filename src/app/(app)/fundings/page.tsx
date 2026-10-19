@@ -18,7 +18,7 @@ export default async function FundingsPage() {
     <div>
       <PageHeader
         title="Funding"
-        description="Kolam dana dari beberapa investor yang dipakai membiayai proyek satu client."
+        description="Dana dari beberapa investor yang dipakai untuk client."
       />
       <FundingsClient fundings={fundings} thirdParties={thirdParties} />
     </div>

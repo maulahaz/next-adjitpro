@@ -12,7 +12,7 @@ export default async function ThirdPartiesPage() {
   return (
     <div>
       <PageHeader
-        title="Pihak Ketiga"
+        title="Mitra (Pihak Ketiga)"
         description="Data mitra/rekanan proyek. Pengguna dengan peran Client dapat ditautkan ke salah satu data di sini."
       />
       <ThirdPartiesClient thirdParties={thirdParties} />

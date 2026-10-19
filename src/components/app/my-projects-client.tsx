@@ -30,42 +30,41 @@ export function MyProjectsClient({
   projects: ClientProjectDTO[];
   fundings: FundingDTO[];
 }) {
-  const optionMap = new Map<string, string>();
-  for (const f of fundings) {
-    optionMap.set(f.id, `${f.nama} (Target: ${formatRupiah(f.targetModal)})`);
-  }
-  // Sertakan Funding yang sedang dipakai proyek (mungkin sudah `Berjalan`) agar
-  // tetap bisa dipertahankan saat mengubah proyek.
-  for (const p of projects) {
-    if (p.fundingId && !optionMap.has(p.fundingId)) {
-      optionMap.set(p.fundingId, `${p.fundingNama || p.fundingId} (sedang dipakai proyek)`);
+  // Opsi untuk proyek BARU: hanya Funding siap pakai (Komplit + aturan bagi hasil).
+  const createOptions = fundings.map((f) => ({
+    value: f.id,
+    label: `${f.nama} (Total: ${formatRupiah(f.targetModal)})`,
+  }));
+
+  /**
+   * Opsi untuk MENGUBAH proyek: selain Funding siap pakai, sertakan Funding yang
+   * sedang dipakai proyek ini (mungkin sudah `Berjalan`) agar bisa dipertahankan.
+   */
+  function optionsForProject(p: ClientProjectDTO) {
+    if (p.fundingId && !createOptions.some((o) => o.value === p.fundingId)) {
+      return [
+        ...createOptions,
+        { value: p.fundingId, label: `${p.fundingNama || p.fundingId} (sedang dipakai proyek)` },
+      ];
     }
+    return createOptions;
   }
-  const fundingOptions = Array.from(optionMap, ([value, label]) => ({ value, label }));
-  const noFunding = fundings.length === 0;
 
   return (
     <DataTable
       toolbar={
-        <div className="flex items-center gap-2">
-          <FormDialog
-            trigger={
-              <Button disabled={noFunding} title={noFunding ? "Belum ada Funding siap pakai." : undefined}>
-                <Plus className="h-4 w-4" /> Proyek Baru
-              </Button>
-            }
-            title="Tambah Proyek"
-            description="Proyek otomatis tertaut ke pihak ketiga akun Anda dan wajib memilih Funding."
-            action={saveProjectAction}
-          >
-            <ClientProjectFields fundingOptions={fundingOptions} />
-          </FormDialog>
-          {noFunding ? (
-            <span className="text-xs text-muted-foreground">
-              Belum ada Funding berstatus Komplit + aturan bagi hasil.
-            </span>
-          ) : null}
-        </div>
+        <FormDialog
+          trigger={
+            <Button>
+              <Plus className="h-4 w-4" /> Proyek Baru
+            </Button>
+          }
+          title="Tambah Proyek"
+          // description="Proyek otomatis tertaut ke pihak ketiga akun Anda dan wajib memilih Funding."
+          action={saveProjectAction}
+        >
+          <ClientProjectFields fundingOptions={createOptions} />
+        </FormDialog>
       }
       searchPlaceholder="Cari proyek…"
       emptyMessage="Belum ada proyek yang terkait dengan akun Anda."
@@ -140,7 +139,7 @@ export function MyProjectsClient({
                     title="Ubah Proyek"
                     action={saveProjectAction}
                   >
-                    <ClientProjectFields project={p} fundingOptions={fundingOptions} />
+                    <ClientProjectFields project={p} fundingOptions={optionsForProject(p)} />
                   </FormDialog>
                   <ConfirmDialog
                     trigger={
@@ -156,7 +155,12 @@ export function MyProjectsClient({
                 </>
               ) : (
                 <span className="self-center text-xs text-muted-foreground">
-                  Ditutup — minta Admin membuka kembali untuk koreksi
+                  <Button variant="ghost" size="icon" aria-label="Ubah" disabled>
+                    <Pencil className="h-4 w-4" />
+                  </Button>
+                  <Button variant="ghost" size="icon" aria-label="Hapus" className="text-destructive" disabled>
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
                 </span>
               )}
             </div>
@@ -193,7 +197,8 @@ function ClientProjectFields({
       <Field
         label="Alokasi Budget (Rp)"
         htmlFor="mp-alokasi"
-        hint="Estimasi alokasi budget dari funding untuk proyek ini. Wajib diisi."
+        hint=""
+        // hint="Estimasi alokasi budget dari funding untuk proyek ini. Wajib diisi."
         required
       >
         <Input
