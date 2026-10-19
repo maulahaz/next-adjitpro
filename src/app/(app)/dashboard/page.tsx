@@ -51,8 +51,9 @@ export default async function DashboardPage() {
         />
       </div>
 
-      <div className="mt-6 grid gap-6 xl:grid-cols-2">
-        {!investorView || data.balances.length > 0 ? (
+      <div className="mt-6 grid">
+      {/* <div className="mt-6 grid gap-6 xl:grid-cols-2"> */}
+        {/* {!investorView || data.balances.length > 0 ? (
           <Card>
             <CardHeader>
               <CardTitle>{investorView ? "Posisi Saya" : "Posisi Investor"}</CardTitle>
@@ -107,7 +108,7 @@ export default async function DashboardPage() {
               />
             </CardContent>
           </Card>
-        ) : null}
+        ) : null} */}
 
         <Card>
           <CardHeader>

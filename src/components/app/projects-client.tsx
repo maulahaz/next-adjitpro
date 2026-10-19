@@ -173,7 +173,7 @@ function ProjectFields({
           options={thirdParties.map((t) => ({ value: t.id, label: t.nama }))}
         />
       </Field>
-      <Field label="Alokasi Budget (Rp)" htmlFor="prj-alokasi" hint="Opsional — budget yang dialokasikan dari funding.">
+      <Field label="Alokasi Budget (Rp)" htmlFor="prj-alokasi" hint="Estimasi alokasi budget dari funding untuk proyek ini.">
         <Input
           id="prj-alokasi"
           name="alokasiBudget"

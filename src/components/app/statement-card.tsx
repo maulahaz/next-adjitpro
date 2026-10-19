@@ -139,7 +139,7 @@ export function StatementCard({
                 <TableHead>Pihak Ketiga</TableHead>
                 <TableHead className="text-right">Kontribusi Saya</TableHead>
                 <TableHead className="text-right">Laba Saya</TableHead>
-                <TableHead>Proyek</TableHead>
+                <TableHead>TotalProyek</TableHead>
                 <TableHead>Jatuh Tempo</TableHead>
                 <TableHead>Status</TableHead>
               </TableRow>

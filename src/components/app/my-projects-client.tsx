@@ -32,7 +32,7 @@ export function MyProjectsClient({
 }) {
   const fundingOptions = fundings.map((f) => ({
     value: f.id,
-    label: `${f.nama} (target: ${formatRupiah(f.targetModal)})`,
+    label: `${f.nama} (Total: ${formatRupiah(f.targetModal)})`,
   }));
 
   return (
@@ -154,7 +154,7 @@ function ClientProjectFields({
           options={fundingOptions}
         />
       </Field>
-      <Field label="Alokasi Budget (Rp)" htmlFor="mp-alokasi" hint="Opsional — budget dari funding untuk proyek ini.">
+      <Field label="Alokasi Budget (Rp)" htmlFor="mp-alokasi" hint="Estimasi alokasi budget dari funding untuk proyek ini.">
         <Input
           id="mp-alokasi"
           name="alokasiBudget"

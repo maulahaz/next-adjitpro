@@ -25,7 +25,7 @@ export interface NavItem {
 export const NAV_ITEMS: NavItem[] = [
   { href: "/dashboard", label: "Dashboard", roles: ["admin", "operator", "investor"], icon: LayoutDashboard },
   // { href: "/my-card", label: "Kartu Saya", roles: ["investor"], icon: CreditCard },
-  { href: "/my-card", label: "Overview Saya", roles: ["investor"], icon: CreditCard },
+  { href: "/my-card", label: "Overview", roles: ["investor"], icon: CreditCard },
   { href: "/my-projects", label: "Proyek Saya", roles: ["client"], icon: FolderKanban },
   { href: "/investors", label: "Investor", roles: ["admin", "operator"], icon: Users },
   { href: "/fundings", label: "Funding", roles: ["admin", "operator"], icon: Coins },

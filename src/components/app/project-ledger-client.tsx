@@ -39,7 +39,7 @@ export function ProjectLedgerClient({
         <StatCard label="Total Debet" value={formatRupiah(totals.debet)} tone="positive" />
         <StatCard label="Total Kredit" value={formatRupiah(totals.kredit)} tone="negative" />
         <StatCard
-          label="Selisih (Debet − Kredit)"
+          label="PROFIT (Debet − Kredit)"
           value={formatRupiah(totals.selisih)}
           tone={totals.selisih < 0 ? "negative" : "default"}
         />
