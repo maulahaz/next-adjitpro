@@ -50,6 +50,7 @@ export interface ProjectEnrichedDTO extends ProjectDTO {
   modal: number;
   pendapatan: number;
   biaya: number;
+  kerugian: number;
   laba: number;
   jumlahInvestor: number;
   sudahDibagikan: boolean;
@@ -190,6 +191,7 @@ export async function listProjectsEnriched(tx: DbOrTx = db): Promise<ProjectEnri
       modal: totals.modal,
       pendapatan: totals.pendapatan,
       biaya: totals.biaya,
+      kerugian: totals.kerugian,
       laba: totals.laba,
       jumlahInvestor,
       sudahDibagikan: totals.sudahDibagikan,

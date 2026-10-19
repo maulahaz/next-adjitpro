@@ -7,13 +7,15 @@ import { asc, eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import {
   fundingContributions,
+  fundingReturns,
   fundings,
+  investAgreements,
   investors,
   projects,
   profitDistributions,
   thirdParties,
 } from "@/lib/db/schema";
-import { ROLES, STATUS } from "@/lib/constants";
+import { LOSS_RULE, ROLES, STATUS } from "@/lib/constants";
 import { toDateString } from "@/lib/domain/dates";
 import { toNum } from "@/lib/domain/money";
 import type { Balance } from "@/lib/domain/balances";
@@ -241,35 +243,213 @@ export async function getInvestorStatement(investorId: string): Promise<Investor
 
 /* ============================= LAPORAN ============================ */
 
+/**
+ * Satu baris ringkasan per Funding untuk halaman Laporan.
+ * Investor hanya melihat Funding yang ia ikuti; `kontribusiSaya`/`labaSaya`
+ * terisi untuk investor dan 0 untuk admin/operator.
+ */
+export interface FundingReportRowDTO {
+  id: string;
+  nama: string;
+  pihakKetigaNama: string;
+  status: string;
+  tanggalMulai: string;
+  jatuhTempo: string;
+  targetModal: number;
+  totalKontribusi: number;
+  totalReturn: number;
+  jumlahInvestor: number;
+  jumlahProyek: number;
+  modalProyek: number;
+  pendapatan: number;
+  biaya: number;
+  kerugian: number;
+  laba: number;
+  labaDibagikan: number;
+  profitInvestor: number;
+  profitClient: number;
+  lossRule: string;
+  kontribusiSaya: number;
+  labaSaya: number;
+}
+
+/** Rincian proyek di bawah Funding (tabel kedua halaman Laporan). */
+export interface FundingReportProjectDTO {
+  id: string;
+  nama: string;
+  fundingId: string;
+  fundingNama: string;
+  status: string;
+  modal: number;
+  pendapatan: number;
+  biaya: number;
+  kerugian: number;
+  laba: number;
+  tanggalMulai: string;
+  tanggalSelesai: string;
+}
+
+export interface FundingReportDTO {
+  rows: FundingReportRowDTO[];
+  projects: FundingReportProjectDTO[];
+  scope: "investor" | "all";
+}
+
 export interface ReportsDTO {
   balances: Balance[];
   projects: ProjectEnrichedDTO[];
   distributions: Awaited<ReturnType<typeof listDistributions>>;
-  fundingSummary: FundingSummaryDTO[];
+  fundingReport: FundingReportDTO;
+}
+
+/** Susun ringkasan per Funding (dipakai halaman Laporan & export CSV). */
+async function buildFundingReport(session: SessionUser | null): Promise<FundingReportDTO> {
+  const isInvestor = session?.role === ROLES.INVESTOR;
+  const investorId = isInvestor ? String(session.investorId) : "";
+
+  const [fRows, tps, contribRows, returnRows, agrRows, projRows, dists] = await Promise.all([
+    db.select().from(fundings).orderBy(asc(fundings.id)),
+    db.select().from(thirdParties),
+    db.select().from(fundingContributions),
+    db.select().from(fundingReturns),
+    db.select().from(investAgreements),
+    listProjectsEnriched(),
+    db.select().from(profitDistributions),
+  ]);
+
+  const tpMap = new Map(tps.map((t) => [t.id, t.nama]));
+  const agrMap = new Map(agrRows.map((a) => [String(a.fundingId), a]));
+
+  const contribByFunding = new Map<string, { total: number; investors: Set<string> }>();
+  const myContribByFunding = new Map<string, number>();
+  for (const c of contribRows) {
+    const key = String(c.fundingId);
+    const agg = contribByFunding.get(key) ?? { total: 0, investors: new Set<string>() };
+    agg.total += toNum(c.jumlah);
+    agg.investors.add(String(c.investorId));
+    contribByFunding.set(key, agg);
+    if (isInvestor && String(c.investorId) === investorId) {
+      myContribByFunding.set(key, (myContribByFunding.get(key) ?? 0) + toNum(c.jumlah));
+    }
+  }
+
+  const returnByFunding = new Map<string, number>();
+  for (const r of returnRows) {
+    const key = String(r.fundingId);
+    returnByFunding.set(key, (returnByFunding.get(key) ?? 0) + toNum(r.jumlah));
+  }
+
+  const projByFunding = new Map<string, ProjectEnrichedDTO[]>();
+  for (const p of projRows) {
+    const key = String(p.fundingId);
+    const list = projByFunding.get(key) ?? [];
+    list.push(p);
+    projByFunding.set(key, list);
+  }
+
+  const distByProject = new Map<string, number>();
+  const myDistByProject = new Map<string, number>();
+  for (const d of dists) {
+    const key = String(d.projectId);
+    distByProject.set(key, (distByProject.get(key) ?? 0) + toNum(d.jumlahLaba));
+    if (isInvestor && String(d.investorId) === investorId) {
+      myDistByProject.set(key, (myDistByProject.get(key) ?? 0) + toNum(d.jumlahLaba));
+    }
+  }
+
+  const rows: FundingReportRowDTO[] = [];
+  for (const f of fRows) {
+    const fundingId = String(f.id);
+    const myContrib = myContribByFunding.get(fundingId) ?? 0;
+    // Investor hanya melihat Funding yang ia danai.
+    if (isInvestor && myContrib <= 0) continue;
+
+    const projs = projByFunding.get(fundingId) ?? [];
+    const agr = agrMap.get(fundingId);
+    const contrib = contribByFunding.get(fundingId);
+
+    let labaDibagikan = 0;
+    let labaSaya = 0;
+    for (const p of projs) {
+      labaDibagikan += distByProject.get(String(p.id)) ?? 0;
+      if (isInvestor) labaSaya += myDistByProject.get(String(p.id)) ?? 0;
+    }
+
+    rows.push({
+      id: fundingId,
+      nama: f.nama,
+      pihakKetigaNama: tpMap.get(f.pihakKetigaId ?? "") ?? "",
+      status: f.status || STATUS.FUND_DRAFT,
+      tanggalMulai: toDateString(f.tanggalMulai),
+      jatuhTempo: toDateString(f.jatuhTempo),
+      targetModal: toNum(f.targetModal),
+      totalKontribusi: contrib?.total ?? 0,
+      totalReturn: returnByFunding.get(fundingId) ?? 0,
+      jumlahInvestor: contrib?.investors.size ?? 0,
+      jumlahProyek: projs.length,
+      modalProyek: projs.reduce((s, p) => s + p.modal, 0),
+      pendapatan: projs.reduce((s, p) => s + p.pendapatan, 0),
+      biaya: projs.reduce((s, p) => s + p.biaya, 0),
+      kerugian: projs.reduce((s, p) => s + p.kerugian, 0),
+      laba: projs.reduce((s, p) => s + p.laba, 0),
+      labaDibagikan,
+      profitInvestor: agr ? toNum(agr.profitInvestor) : 0,
+      profitClient: agr ? toNum(agr.profitClient) : 0,
+      lossRule: agr?.lossRule ?? LOSS_RULE.PROPORSIONAL,
+      kontribusiSaya: isInvestor ? myContrib : 0,
+      labaSaya: isInvestor ? labaSaya : 0,
+    });
+  }
+
+  const visibleFundings = new Set(rows.map((r) => r.id));
+  const projectRows: FundingReportProjectDTO[] = projRows
+    .filter((p) => visibleFundings.has(String(p.fundingId)))
+    .map((p) => ({
+      id: p.id,
+      nama: p.nama,
+      fundingId: String(p.fundingId),
+      fundingNama: p.fundingNama,
+      status: p.status,
+      modal: p.modal,
+      pendapatan: p.pendapatan,
+      biaya: p.biaya,
+      kerugian: p.kerugian,
+      laba: p.laba,
+      tanggalMulai: p.tanggalMulai,
+      tanggalSelesai: p.tanggalSelesaiAktual || p.tanggalSelesaiRencana,
+    }));
+
+  return { rows, projects: projectRows, scope: isInvestor ? "investor" : "all" };
 }
 
 export async function getReports(): Promise<ReportsDTO> {
-  const [balances, projs, dists] = await Promise.all([
+  const [balances, projs, dists, fundingReport] = await Promise.all([
     loadBalances(),
     listProjectsEnriched(),
     listDistributions(),
+    buildFundingReport(null),
   ]);
-  return { balances, projects: projs, distributions: dists, fundingSummary: [] };
+  return { balances, projects: projs, distributions: dists, fundingReport };
 }
 
 export async function getReportsScoped(session: SessionUser): Promise<ReportsDTO> {
-  if (session.role !== ROLES.INVESTOR) return getReports();
+  const isInvestor = session.role === ROLES.INVESTOR;
 
-  const [balances, projs, dists, summary] = await Promise.all([
+  const [balances, projs, dists, fundingReport] = await Promise.all([
     loadBalances(),
-    listProjectsForInvestor(session.investorId),
+    isInvestor ? listProjectsForInvestor(session.investorId) : listProjectsEnriched(),
     listDistributions(),
-    listFundingsForInvestor(session.investorId),
+    buildFundingReport(session),
   ]);
+
   return {
-    balances: balances.filter((b) => String(b.id) === String(session.investorId)),
+    balances: isInvestor
+      ? balances.filter((b) => String(b.id) === String(session.investorId))
+      : balances,
     projects: projs,
-    distributions: dists.filter((d) => String(d.investorId) === String(session.investorId)),
-    fundingSummary: summary,
+    distributions: isInvestor
+      ? dists.filter((d) => String(d.investorId) === String(session.investorId))
+      : dists,
+    fundingReport,
   };
 }

@@ -15,7 +15,7 @@
 | **Proyek** | Master proyek (wajib memilih **Funding** + `alokasi_budget`), transaksi proyek (pendapatan/biaya), **Bagi Hasil**, **Tutup Proyek**. Buat/ubah/hapus proyek dilakukan **admin** (di sini) dan **client** (di Proyek Saya); operator read-only. **Investor** dapat membuka **detail proyek** (read-only, tanpa aksi) untuk proyek yang ia danai. |
 | **Mutasi Modal** | Riwayat setoran/penarikan modal, filter per investor, rekap netto. |
 | **Bagi Hasil** | Riwayat pembagian laba per proyek per investor beserta porsi (%). |
-| **Laporan** | Rekap investor, rekap proyek, riwayat bagi hasil, **export CSV**, dan **cetak**. Investor melihat versi ter-scope + **Ringkasan Funding** yang ia ikuti. |
+| **Laporan** | **Ringkasan per Funding** (target, dana terhimpun, jumlah investor/proyek, modal, pendapatan, biaya, kerugian, laba, laba dibagikan, pokok kembali, status, jatuh tempo) + **rincian proyek per Funding**, **export CSV**, dan **cetak**. Investor melihat versi ter-scope (`Kontribusi Saya` & `Laba Saya`) hanya untuk Funding yang ia ikuti. |
 | **Pengguna** | Kelola akun (khusus admin): peran, tautan ke investor/pihak ketiga, **reset password ke `pass-123`**, aktif/nonaktif. |
 | **Kartu Saya** | Halaman investor: statement dirinya sendiri + **ringkasan Funding**. |
 | **Proyek Saya** | Halaman client: daftar proyek milik pihak ketiganya (kolom Funding menampilkan **nama + total dana terhimpun**). Client dapat **menambah/mengubah/menghapus proyeknya** (wajib memilih Funding `Release` beraturan hasil + wajib mengisi Alokasi Budget), **menutup proyek** yang selesai (memicu notifikasi email ke investor + mencatat **selisih Ledger** sebagai transaksi otomatis), dan membuka **Buka Ledger** per proyek. Proyek `Ditutup` hanya bisa dibaca. |

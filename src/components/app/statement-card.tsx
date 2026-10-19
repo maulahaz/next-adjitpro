@@ -136,7 +136,7 @@ export function StatementCard({
             head={
               <TableRow>
                 <TableHead>Funding</TableHead>
-                <TableHead>Pihak Ketiga</TableHead>
+                <TableHead>Mitra</TableHead>
                 <TableHead className="text-right">Kontribusi Saya</TableHead>
                 <TableHead className="text-right">Laba Saya</TableHead>
                 <TableHead>TotalProyek</TableHead>
@@ -187,7 +187,7 @@ export function StatementCard({
             rows={distributions.map((d) => (
               <TableRow key={d.id}>
                 <TableCell>{displayDate(d.tanggal)}</TableCell>
-                <TableCell className="font-medium">{d.projectNama}</TableCell>
+                <TableCell className="font-medium">{d.projectNama + " " + d.projectId}</TableCell>
                 <TableCell className="text-right tabular-nums">{formatPorsi(d.porsi)}</TableCell>
                 <TableCell
                   className={`text-right tabular-nums ${d.jumlahLaba < 0 ? "text-destructive" : "text-success"}`}

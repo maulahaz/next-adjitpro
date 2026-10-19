@@ -326,10 +326,10 @@ Kode persyaratan dipakai sebagai rujukan uji & pelacakan.
 
 | ID | Kebutuhan | Prioritas |
 | --- | --- | --- |
-| FR-REP-01 | Rekap investor (posisi modal & laba). | Wajib |
-| FR-REP-02 | Rekap proyek (modal, pendapatan, biaya, laba, status). | Wajib |
-| FR-REP-03 | Riwayat bagi hasil. | Wajib |
-| FR-REP-04 | **Ekspor CSV** untuk rekap investor & proyek. | Wajib |
+| FR-REP-01 | **Ringkasan per Funding** (satu baris per Funding): target modal, dana terhimpun, jumlah investor, jumlah proyek, modal proyek, pendapatan, biaya, kerugian, laba, laba dibagikan, pokok dikembalikan, status, dan jatuh tempo. | Wajib |
+| FR-REP-02 | **Rincian proyek per Funding**: proyek, status, periode, modal, pendapatan, biaya, kerugian, dan laba. | Wajib |
+| FR-REP-03 | Investor hanya melihat **Funding yang ia ikuti**, dengan kolom tambahan **Kontribusi Saya** dan **Laba Saya**. | Wajib |
+| FR-REP-04 | **Ekspor CSV** ringkasan Funding dan rincian proyek. | Wajib |
 | FR-REP-05 | **Cetak** halaman laporan. | Wajib |
 | FR-REP-06 | Endpoint ekspor menolak pengguna tanpa sesi yang sah. | Wajib |
 

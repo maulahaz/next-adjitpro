@@ -38,7 +38,12 @@ import {
 import { addCapitalTransaction, distributeProfit, closeProject } from "@/lib/services/finance";
 import { loadBalances } from "@/lib/services/ledger";
 import { listProjectLedgers, saveProjectLedger, deleteProjectLedger } from "@/lib/services/project-ledgers";
-import { getDashboardScoped, listProjectsForClient, getInvestorStatement } from "@/lib/services/reports";
+import {
+  getDashboardScoped,
+  getReports,
+  listProjectsForClient,
+  getInvestorStatement,
+} from "@/lib/services/reports";
 import { saveUser, ensureDefaultAdmin, changeOwnPassword } from "@/lib/services/users";
 import { login } from "@/lib/services/auth";
 import { legacyHashPassword } from "@/lib/auth/password";
@@ -176,6 +181,19 @@ describe.skipIf(!hasDb)("integrasi: alur keuangan lengkap", () => {
     expect(statement.fundingSummary).toHaveLength(1);
     expect(statement.fundingSummary[0]!.kontribusiSaya).toBe(225000000);
     expect(statement.fundingSummary[0]!.labaSaya).toBe(35625000);
+
+    // Laporan ringkasan per Funding.
+    const report = await getReports();
+    const fundingRow = report.fundingReport.rows.find((r) => r.id === funding.id)!;
+    expect(fundingRow.jumlahInvestor).toBe(3);
+    expect(fundingRow.jumlahProyek).toBe(1);
+    expect(fundingRow.totalKontribusi).toBe(600000000);
+    expect(fundingRow.modalProyek).toBe(600000000);
+    expect(fundingRow.laba).toBe(95000000);
+    expect(fundingRow.labaDibagikan).toBe(95000000);
+    expect(fundingRow.profitInvestor).toBe(100);
+    expect(fundingRow.profitClient).toBe(0);
+    expect(report.fundingReport.projects.filter((p) => p.fundingId === funding.id)).toHaveLength(1);
 
     // Pengembalian pokok: idle investor dilepas dan funding berstatus Lunas.
     await addFundingReturn({ fundingId: funding.id, jumlah: 600000000 }, "test");

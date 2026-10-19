@@ -37,6 +37,54 @@ export async function GET(req: NextRequest) {
   const type = req.nextUrl.searchParams.get("type") ?? "investors";
   const reports = await getReportsScoped(user);
 
+  if (type === "fundings") {
+    const headers = [
+      "ID",
+      "Nama",
+      "Mitra",
+      "Status",
+      "Tanggal Mulai",
+      "Jatuh Tempo",
+      "Target",
+      "Terhimpun",
+      "Investor",
+      "Proyek",
+      "Modal Proyek",
+      "Pendapatan",
+      "Biaya",
+      "Kerugian",
+      "Laba",
+      "Dibagikan",
+      "Pokok Kembali",
+      "Porsi Investor (%)",
+      "Porsi Client (%)",
+      "Aturan Rugi",
+    ];
+    const rows = reports.fundingReport.rows.map((f) => [
+      f.id,
+      f.nama,
+      f.pihakKetigaNama,
+      f.status,
+      displayDate(f.tanggalMulai),
+      displayDate(f.jatuhTempo),
+      f.targetModal,
+      f.totalKontribusi,
+      f.jumlahInvestor,
+      f.jumlahProyek,
+      f.modalProyek,
+      f.pendapatan,
+      f.biaya,
+      f.kerugian,
+      f.laba,
+      f.labaDibagikan,
+      f.totalReturn,
+      formatPorsi(f.profitInvestor),
+      formatPorsi(f.profitClient),
+      f.lossRule,
+    ]);
+    return csvResponse("ringkasan-funding.csv", toCsv(headers, rows));
+  }
+
   if (type === "projects") {
     const headers = [
       "ID",
