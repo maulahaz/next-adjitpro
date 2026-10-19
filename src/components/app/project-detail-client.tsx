@@ -1,7 +1,16 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowLeft, CheckCircle2, ExternalLink, PieChart, Plus, RotateCcw, Trash2 } from "lucide-react";
+import {
+  ArrowLeft,
+  CheckCircle2,
+  ExternalLink,
+  PieChart,
+  Plus,
+  RotateCcw,
+  Trash2,
+  Undo2,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -15,7 +24,11 @@ import {
   deleteProjectTransactionAction,
   reopenProjectAction,
 } from "@/app/actions/projects";
-import { closeProjectAction, distributeProfitAction } from "@/app/actions/finance";
+import {
+  cancelDistributionAction,
+  closeProjectAction,
+  distributeProfitAction,
+} from "@/app/actions/finance";
 import { formatRupiah, formatPorsi } from "@/lib/domain/money";
 import { computeLedgerTotals } from "@/lib/domain/ledger-totals";
 import { displayDate, todayStr } from "@/lib/domain/dates";
@@ -44,6 +57,12 @@ export function ProjectDetailClient({
   const locked = project.status === "Ditutup";
   const sudahDibagikan = totals.sudahDibagikan;
   const canEdit = canWrite && !locked && !sudahDibagikan;
+  // Bagi hasil boleh menyusul setelah proyek ditutup (mis. selisih Ledger baru
+  // diketahui saat penutupan). Operator boleh membagikan; hanya Admin/Client
+  // yang menutup proyek.
+  const canDistribute = canWrite && !sudahDibagikan && totals.modal > 0 && totals.laba !== 0;
+  const canCancelDistribution = canWrite && sudahDibagikan;
+  const showActions = canDistribute || canCancelDistribution || isAdmin;
 
   return (
     <div className="space-y-6">
@@ -72,81 +91,104 @@ export function ProjectDetailClient({
           ) : null}
         </div>
 
-        {locked && isAdmin ? (
+        {showActions ? (
           <div className="flex flex-wrap gap-2">
-            <FormDialog
-              trigger={
-                <Button variant="outline">
-                  <RotateCcw className="h-4 w-4" /> Buka Kembali
-                </Button>
-              }
-              title="Buka Kembali Proyek"
-              description="Proyek dibuka kembali (khusus Admin) agar kesalahan input bisa diperbaiki. Setelah selesai, tutup kembali proyek."
-              action={reopenProjectAction}
-              submitLabel="Buka Kembali"
-            >
-              <input type="hidden" name="id" value={project.id} />
-              <p className="text-sm text-muted-foreground">
-                Status dikembalikan otomatis: Selesai (sudah dibagikan), Berjalan (sudah ada entri
-                Ledger), atau Draft.
-              </p>
-            </FormDialog>
-          </div>
-        ) : !locked && canWrite ? (
-          <div className="flex flex-wrap gap-2">
-            <FormDialog
-              trigger={
-                <Button disabled={sudahDibagikan || totals.modal <= 0 || totals.laba === 0}>
-                  <PieChart className="h-4 w-4" /> Bagi Hasil
-                </Button>
-              }
-              title="Bagi Hasil Proyek"
-              description="Laba dipecah sesuai persen pada aturan hasil (invest_agreements), lalu dibagi pro-rata ke kontributor Funding. Proyek akan berstatus Selesai."
-              action={distributeProfitAction}
-              submitLabel="Bagikan Laba"
-            >
-              <input type="hidden" name="projectId" value={project.id} />
-              <div className="rounded-md border bg-muted/40 p-3 text-sm">
-                <div className="flex justify-between">
-                  <span>Alokasi budget</span>
-                  <span className="font-medium">{formatRupiah(totals.modal)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Laba dibagi</span>
-                  <span className={`font-semibold ${totals.laba < 0 ? "text-destructive" : "text-success"}`}>
-                    {formatRupiah(totals.laba)}
-                  </span>
-                </div>
-                {agreement ? (
-                  <div className="mt-1 flex justify-between text-muted-foreground">
-                    <span>Porsi investor / client</span>
-                    <span>
-                      {formatPorsi(agreement.profitInvestor)}% / {formatPorsi(agreement.profitClient)}%
+            {canDistribute ? (
+              <FormDialog
+                trigger={
+                  <Button>
+                    <PieChart className="h-4 w-4" /> Bagi Hasil
+                  </Button>
+                }
+                title="Bagi Hasil Proyek"
+                description={
+                  locked
+                    ? "Laba dipecah sesuai persen pada aturan hasil (invest_agreements), lalu dibagi pro-rata ke kontributor Funding. Proyek tetap berstatus Ditutup."
+                    : "Laba dipecah sesuai persen pada aturan hasil (invest_agreements), lalu dibagi pro-rata ke kontributor Funding. Proyek akan berstatus Selesai."
+                }
+                action={distributeProfitAction}
+                submitLabel="Bagikan Laba"
+              >
+                <input type="hidden" name="projectId" value={project.id} />
+                <div className="rounded-md border bg-muted/40 p-3 text-sm">
+                  <div className="flex justify-between">
+                    <span>Alokasi budget</span>
+                    <span className="font-medium">{formatRupiah(totals.modal)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Laba dibagi</span>
+                    <span className={`font-semibold ${totals.laba < 0 ? "text-destructive" : "text-success"}`}>
+                      {formatRupiah(totals.laba)}
                     </span>
                   </div>
-                ) : null}
-              </div>
-              <Field label="Tanggal Bagi Hasil" htmlFor="dist-tanggal">
-                <Input id="dist-tanggal" name="tanggal" type="date" defaultValue={todayStr()} />
-              </Field>
-            </FormDialog>
+                  {agreement ? (
+                    <div className="mt-1 flex justify-between text-muted-foreground">
+                      <span>Porsi investor / client</span>
+                      <span>
+                        {formatPorsi(agreement.profitInvestor)}% / {formatPorsi(agreement.profitClient)}%
+                      </span>
+                    </div>
+                  ) : null}
+                </div>
+                <Field label="Tanggal Bagi Hasil" htmlFor="dist-tanggal">
+                  <Input id="dist-tanggal" name="tanggal" type="date" defaultValue={todayStr()} />
+                </Field>
+              </FormDialog>
+            ) : null}
 
-            <FormDialog
-              trigger={
-                <Button variant="outline">
-                  <CheckCircle2 className="h-4 w-4" /> Tutup Proyek
-                </Button>
-              }
-              title="Tutup Proyek"
-              description="Mengubah status menjadi Ditutup dan mengirim notifikasi email ke seluruh investor pendana Funding proyek ini."
-              action={closeProjectAction}
-              submitLabel="Tutup Proyek"
-            >
-              <input type="hidden" name="projectId" value={project.id} />
-              <p className="text-sm text-muted-foreground">
-                Proyek berlaba wajib dibagikan terlebih dahulu sebelum ditutup.
-              </p>
-            </FormDialog>
+            {canCancelDistribution ? (
+              <ConfirmDialog
+                trigger={
+                  <Button variant="outline" className="text-destructive">
+                    <Undo2 className="h-4 w-4" /> Batal Bagi Hasil
+                  </Button>
+                }
+                title="Batal Bagi Hasil"
+                description={`Hapus seluruh baris bagi hasil proyek ${project.nama}? Laba dapat dibagikan ulang setelah ini.`}
+                action={cancelDistributionAction}
+                hidden={{ projectId: project.id }}
+                confirmLabel="Batal Bagi Hasil"
+              />
+            ) : null}
+
+            {!locked && isAdmin ? (
+              <FormDialog
+                trigger={
+                  <Button variant="outline">
+                    <CheckCircle2 className="h-4 w-4" /> Tutup Proyek
+                  </Button>
+                }
+                title="Tutup Proyek"
+                description="Mengubah status menjadi Ditutup dan mengirim notifikasi email ke seluruh investor pendana Funding proyek ini."
+                action={closeProjectAction}
+                submitLabel="Tutup Proyek"
+              >
+                <input type="hidden" name="projectId" value={project.id} />
+                <p className="text-sm text-muted-foreground">
+                  Bagi hasil dapat dilakukan setelah proyek ditutup (oleh Admin/Operator).
+                </p>
+              </FormDialog>
+            ) : null}
+
+            {locked && isAdmin ? (
+              <FormDialog
+                trigger={
+                  <Button variant="outline">
+                    <RotateCcw className="h-4 w-4" /> Buka Kembali
+                  </Button>
+                }
+                title="Buka Kembali Proyek"
+                description="Proyek dibuka kembali (khusus Admin) agar kesalahan input bisa diperbaiki. Setelah selesai, tutup kembali proyek."
+                action={reopenProjectAction}
+                submitLabel="Buka Kembali"
+              >
+                <input type="hidden" name="id" value={project.id} />
+                <p className="text-sm text-muted-foreground">
+                  Status dikembalikan otomatis: Selesai (sudah dibagikan), Berjalan (sudah ada entri
+                  Ledger), atau Draft.
+                </p>
+              </FormDialog>
+            ) : null}
           </div>
         ) : null}
       </div>

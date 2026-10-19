@@ -57,6 +57,14 @@ export default async function DashboardPage() {
         />
         {!investorView ? (
           <StatCard
+            label="Laba Belum Dibagikan"
+            value={formatRupiah(data.labaBelumDibagikan)}
+            tone={data.labaBelumDibagikan !== 0 ? "negative" : "muted"}
+            sub="Proyek Ditutup tanpa bagi hasil"
+          />
+        ) : null}
+        {!investorView ? (
+          <StatCard
             label="Funding"
             value={String(data.fundings.length)}
             sub={`Target ${formatRupiah(data.fundings.reduce((s, f) => s + f.targetModal, 0))}`}
@@ -222,6 +230,10 @@ export default async function DashboardPage() {
                       {p.sudahDibagikan ? (
                         <Badge variant="secondary" className="text-[10px]">
                           dibagikan
+                        </Badge>
+                      ) : p.laba !== 0 ? (
+                        <Badge variant="outline" className="text-[10px] text-amber-600">
+                          belum dibagikan
                         </Badge>
                       ) : null}
                     </div>

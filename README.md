@@ -14,11 +14,11 @@
 | **Funding** | **Kolam dana** milik satu client yang menghimpun dana beberapa investor (**kontribusi**), mengatur **bagi hasil** (persen investor/client + aturan rugi), dan menerima **pengembalian pokok** dari client. Satu Funding membiayai beberapa proyek. Siklus status: `Draft` → `Komplit` → `Release` → `Berjalan` → `Lunas`. Admin/operator. |
 | **Proyek** | Master proyek (wajib memilih **Funding** + `alokasi_budget`), transaksi proyek (pendapatan/biaya), **Bagi Hasil**, **Tutup Proyek**. Buat/ubah/hapus proyek dilakukan **admin** (di sini) dan **client** (di Proyek Saya); operator read-only. **Investor** dapat membuka **detail proyek** (read-only, tanpa aksi) untuk proyek yang ia danai. |
 | **Mutasi Modal** | Riwayat setoran/penarikan modal, filter per investor, rekap netto. |
-| **Bagi Hasil** | Riwayat pembagian laba per proyek per investor beserta porsi (%). |
+| **Bagi Hasil** | Riwayat pembagian laba per proyek per investor beserta porsi (%). Bisa dijalankan setelah proyek `Ditutup` dan bisa **dibatalkan** (Batal Bagi Hasil) untuk diulang. |
 | **Laporan** | **Ringkasan per Funding** (target, dana terhimpun, jumlah investor/proyek, modal, pendapatan, biaya, kerugian, laba, laba dibagikan, pokok kembali, status, jatuh tempo) + **rincian proyek per Funding**, **export CSV**, dan **cetak**. Investor melihat versi ter-scope (`Kontribusi Saya` & `Laba Saya`) hanya untuk Funding yang ia ikuti. |
 | **Pengguna** | Kelola akun (khusus admin): peran, tautan ke investor/pihak ketiga, **reset password ke `pass-123`**, aktif/nonaktif. |
 | **Kartu Saya** | Halaman investor: statement dirinya sendiri + **ringkasan Funding**. |
-| **Proyek Saya** | Halaman client: daftar proyek milik pihak ketiganya (kolom Funding menampilkan **nama + total dana terhimpun**). Client dapat **menambah/mengubah/menghapus proyeknya** (wajib memilih Funding `Release` beraturan hasil + wajib mengisi Alokasi Budget), **menutup proyek** yang selesai (memicu notifikasi email ke investor + mencatat **selisih Ledger** sebagai transaksi otomatis), dan membuka **Buka Ledger** per proyek. Proyek `Ditutup` hanya bisa dibaca. |
+| **Proyek Saya** | Halaman client: daftar proyek milik pihak ketiganya (kolom Funding menampilkan **nama + total dana terhimpun**). Client dapat **menambah/mengubah/menghapus proyeknya** (wajib memilih Funding `Release` beraturan hasil + wajib mengisi Alokasi Budget), **menutup proyek** yang selesai (memicu notifikasi email ke investor + mencatat **selisih Ledger** sebagai transaksi otomatis), dan membuka **Buka Ledger** per proyek. **Bagi hasil dilakukan Admin/Operator setelah proyek ditutup.** Proyek `Ditutup` hanya bisa dibaca. |
 | **Ledger Proyek** | Ledger **Debet/Kredit** per proyek. Ditampilkan sebagai tabel **No · Tanggal · Deskripsi · Debet · Kredit · Keterangan** (nilai masuk ke kolom Debet/Kredit sesuai jenis) dengan baris **Total**. **Hanya peran `client`** yang dapat menambah/ubah/menghapus entri — dan hanya untuk proyek milik pihak ketiganya. Peran lain hanya **membaca** (read-only) di detail proyek; Ledger **terkunci** saat proyek `Ditutup` (admin dapat membuka kembali proyek). |
 | **Ganti Password** | Setiap pengguna dapat mengganti password sendiri (wajib tahu password lama). |
 
@@ -39,7 +39,9 @@
    persentase agreement `numeric(5,2)`.
 5. **ID format** (`INV-0001`, `PRJ-0001`, …) dan bersifat atomik via tabel `counters`.
 6. Penarikan modal maupun **kontribusi ke Funding** tidak boleh melebihi **saldo idle**.
-7. Proyek berlaba **wajib dibagikan** sebelum bisa ditutup, dan tidak bisa dibagikan dua kali.
+7. **Penutupan tidak mewajibkan bagi hasil.** Client (atau Admin) menutup proyek lebih dulu; **Admin/Operator
+   menjalankan bagi hasil setelahnya** (termasuk selisih Ledger yang baru diketahui saat penutupan). Bagi hasil
+   hanya sekali per proyek, dan bisa **dibatalkan** ("Batal Bagi Hasil") untuk dibagikan ulang.
 8. **Setiap proyek wajib punya Funding** dan **wajib mengisi Alokasi Budget**. Funding hanya bisa
    dihapus bila belum dipakai proyek/kontribusi. **Penutupan proyek** mengirim **notifikasi email**
    ke investor pendana (default mode `log` — belum mengirim email sungguhan).
@@ -51,14 +53,18 @@
     dikembalikan). **Client hanya boleh memilih Funding `Release`**; jumlah porsi investor +
     client wajib **tepat 100%**; jatuh tempo bagi hasil = **N bulan** setelah jatuh tempo Funding.
 11. **Siklus proyek**: proyek baru berstatus `Draft` dan menjadi `Berjalan` saat **entri Ledger
-    pertama** ditambahkan → `Selesai` setelah bagi hasil → `Ditutup` setelah penutupan. Saat
-    **penutupan**, selisih Ledger (`Debet − Kredit`) dicatat sebagai **transaksi proyek**
-    otomatis: positif → `Pendapatan`, negatif → `Kerugian` (jumlah selalu positif). Baris ini
-    bertanda *sistem* (tidak bisa dihapus manual) dan **ikut menambah/mengurangi Laba** proyek,
-    sehingga proyek `Ditutup` menampilkan Laba dari hasil Ledger-nya.
+    pertama** ditambahkan. **Client** (atau Admin) menutup proyek yang sudah selesai → `Ditutup`;
+    bagi hasil menyusul kapan saja setelahnya (proyek `Ditutup` tetap `Ditutup`, hanya proyek
+    `Berjalan` yang menjadi `Selesai` setelah bagi hasil). Saat **penutupan**, selisih Ledger
+    (`Debet − Kredit`) dicatat sebagai **transaksi proyek** otomatis: positif → `Pendapatan`,
+    negatif → `Kerugian` (jumlah selalu positif). Baris ini bertanda *sistem* (tidak bisa dihapus
+    manual) dan **ikut menambah/mengurangi Laba** proyek, sehingga proyek `Ditutup` menampilkan
+    Laba dari hasil Ledger-nya.
 12. Proyek `Ditutup` **mengunci Ledger** (hanya baca); **admin** dapat **membuka kembali** proyek
-    untuk koreksi (status dipulihkan sesuai riwayat). Dashboard menampilkan **Total Profit proyek
-    `Ditutup`** dan daftar **Funding** (admin/operator).
+    untuk koreksi (status dipulihkan sesuai riwayat). **Operator** hanya menjalankan **Bagi Hasil**
+    (tidak menutup/membuka proyek). Bagi hasil yang salah dapat dibatalkan lewat **Batal Bagi
+    Hasil** (hanya admin/operator). Dashboard menampilkan **Total Profit proyek `Ditutup`**, **Laba
+    Belum Dibagikan**, dan daftar **Funding** (admin/operator).
 
 ### Peran & menu
 
@@ -188,9 +194,10 @@ Perbedaan teknis yang disengaja:
   mengisi Alokasi Budget**, dan **hanya boleh memilih Funding `Release` yang sudah beraturan
   bagi hasil**) dan **menutup proyek** lewat menu **Proyek Saya**; admin tetap mengelola semua
   proyek di menu **Proyek** (termasuk **membuka kembali** proyek `Ditutup`), sedangkan operator
-  hanya membaca. Penghapusan proyek hanya untuk `Draft` tanpa riwayat keuangan. Proyek baru
-  berstatus `Draft` hingga **entri Ledger pertama** membuatnya `Berjalan`; proyek `Ditutup`
-  mengunci Ledger.
+  **hanya menjalankan Bagi Hasil** (tidak menutup/membuka proyek). Bagi hasil menyusul **setelah**
+  proyek ditutup dan bisa dibatalkan lewat **Batal Bagi Hasil**. Penghapusan proyek hanya untuk
+  `Draft` tanpa riwayat keuangan. Proyek baru berstatus `Draft` hingga **entri Ledger pertama**
+  membuatnya `Berjalan`; proyek `Ditutup` mengunci Ledger.
 - **Standar tampilan tabel** (`src/components/app/data-table.tsx`, `DataTable`) dipakai
   oleh **semua** daftar data: paginasi maksimum **10 baris/halaman** + kotak **pencarian**
   yang muncul otomatis bila data lebih dari satu halaman, dengan toolbar aksi/filter dan

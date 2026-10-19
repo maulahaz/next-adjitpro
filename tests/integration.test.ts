@@ -35,7 +35,12 @@ import {
   saveAgreement,
   saveFunding,
 } from "@/lib/services/fundings";
-import { addCapitalTransaction, distributeProfit, closeProject } from "@/lib/services/finance";
+import {
+  addCapitalTransaction,
+  cancelDistribution,
+  distributeProfit,
+  closeProject,
+} from "@/lib/services/finance";
 import { loadBalances } from "@/lib/services/ledger";
 import { listProjectLedgers, saveProjectLedger, deleteProjectLedger } from "@/lib/services/project-ledgers";
 import {
@@ -236,12 +241,13 @@ describe.skipIf(!hasDb)("integrasi: alur keuangan lengkap", () => {
     ).rejects.toThrow(/Saldo idle/);
   });
 
-  it("menolak menutup proyek berlaba yang belum dibagikan", async () => {
+  it("tutup proyek berlaba tanpa bagi hasil; bagi hasil menyusul lalu bisa dibatalkan", async () => {
     const tp = await saveThirdParty({ nama: "PT F" }, "test");
     const funding = await makeFunding(tp.id);
     const inv = await saveInvestor({ nama: "F" }, "test");
     await addCapitalTransaction({ investorId: inv.id, tipe: "Setor", jumlah: 10000000 }, "test");
     await addContribution({ fundingId: funding.id, investorId: inv.id, jumlah: 10000000 }, "test");
+    await saveAgreement({ fundingId: funding.id, profitInvestor: 100, profitClient: 0 }, "test");
 
     const project = await saveProject(
       { nama: "Proyek F", fundingId: funding.id, alokasiBudget: 10000000 },
@@ -249,7 +255,28 @@ describe.skipIf(!hasDb)("integrasi: alur keuangan lengkap", () => {
     );
     await addProjectTransaction({ projectId: project.id, tipe: "Pendapatan", jumlah: 1000000 }, "test");
 
-    await expect(closeProject(project.id, "test")).rejects.toThrow(/Bagi hasil terlebih dahulu/);
+    // Penutupan tidak lagi mewajibkan bagi hasil (Client boleh menutup lebih dulu).
+    await closeProject(project.id, "test");
+    let detail = await getProjectDetail(project.id);
+    expect(detail.project.status).toBe("Ditutup");
+    expect(detail.totals.sudahDibagikan).toBe(false);
+
+    // Bagi hasil boleh menyusul pada proyek yang sudah Ditutup; status tetap Ditutup.
+    const dist = await distributeProfit(project.id, undefined, "test");
+    expect(dist.laba).toBe(1000000);
+    expect(dist.investorPool).toBe(1000000);
+
+    detail = await getProjectDetail(project.id);
+    expect(detail.project.status).toBe("Ditutup");
+    expect(detail.totals.sudahDibagikan).toBe(true);
+
+    // "Batal Bagi Hasil" menghapus distribusi; proyek tetap Ditutup & bisa diulang.
+    const cancel = await cancelDistribution(project.id, "test");
+    expect(cancel.jumlahBaris).toBe(1);
+    detail = await getProjectDetail(project.id);
+    expect(detail.totals.sudahDibagikan).toBe(false);
+    expect(detail.project.status).toBe("Ditutup");
+    await expect(cancelDistribution(project.id, "test")).rejects.toThrow(/belum dibagikan/);
   });
 
   it("scoping peran: dashboard investor & proyek client tanpa data keuangan", async () => {

@@ -5,6 +5,7 @@ import { requireRoles, requireWrite } from "@/lib/auth/guard";
 import { ROLES } from "@/lib/constants";
 import {
   addCapitalTransaction,
+  cancelDistribution,
   closeProject,
   deleteCapitalTransaction,
   distributeProfit,
@@ -76,13 +77,33 @@ export async function distributeProfitAction(_prev: ActionState, formData: FormD
 }
 
 /**
+ * Batal bagi hasil proyek — hapus seluruh baris bagi hasil agar bisa diulang.
+ * Khusus admin/operator.
+ */
+export async function cancelDistributionAction(
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  try {
+    const session = await requireWrite();
+    const projectId = str(formData, "projectId");
+    const result = await cancelDistribution(projectId, session.username);
+    revalidate(projectId);
+    return ok(`Bagi hasil proyek ${result.project} dibatalkan. Laba dapat dibagikan ulang.`);
+  } catch (err) {
+    return errorState(err);
+  }
+}
+
+/**
  * Tutup proyek — pengganti `apiCloseProject`.
- * Boleh admin/operator maupun client (hanya proyek miliknya). Setelah ditutup,
- * investor pendana Funding proyek ini menerima notifikasi email.
+ * Hanya admin dan client (client hanya proyek miliknya). Operator tidak menutup
+ * proyek; tugasnya hanya menjalankan bagi hasil. Setelah ditutup, investor
+ * pendana Funding proyek ini menerima notifikasi email.
  */
 export async function closeProjectAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
   try {
-    const session = await requireRoles([ROLES.ADMIN, ROLES.OPERATOR, ROLES.CLIENT]);
+    const session = await requireRoles([ROLES.ADMIN, ROLES.CLIENT]);
     const projectId = str(formData, "projectId");
     const scope = session.role === ROLES.CLIENT ? { thirdPartyId: session.thirdPartyId } : undefined;
     const result = await closeProject(projectId, session.username, scope);

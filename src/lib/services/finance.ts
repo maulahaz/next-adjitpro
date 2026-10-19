@@ -168,7 +168,6 @@ export async function distributeProfit(
     const projectRows = await tx.select().from(projects).where(eq(projects.id, projectId)).limit(1);
     const project = projectRows[0];
     if (!project) throw new AppError("Proyek tidak ditemukan.");
-    if (project.status === STATUS.PROYEK_DITUTUP) throw new AppError("Proyek sudah ditutup.");
 
     const totals = await computeTotalsFor(projectId, tx);
     if (totals.sudahDibagikan) throw new AppError("Proyek ini sudah pernah dibagikan hasilnya.");
@@ -222,7 +221,11 @@ export async function distributeProfit(
       });
     }
 
-    await tx.update(projects).set({ status: STATUS.PROYEK_SELESAI }).where(eq(projects.id, projectId));
+    // Proyek yang sudah `Ditutup` (mis. ditutup lebih dulu oleh Client) tetap
+    // `Ditutup` — bagi hasil boleh menyusul tanpa membuka kembali proyek.
+    if (project.status !== STATUS.PROYEK_DITUTUP) {
+      await tx.update(projects).set({ status: STATUS.PROYEK_SELESAI }).where(eq(projects.id, projectId));
+    }
 
     return {
       project: project.nama,
@@ -238,6 +241,54 @@ export async function distributeProfit(
     sheet: "Projects",
     recordId: projectId,
     detail: `Laba ${result.laba}`,
+    user: actor,
+  });
+  return result;
+}
+
+export interface CancelDistributeResult {
+  project: string;
+  /** Jumlah baris `profit_distributions` yang dihapus. */
+  jumlahBaris: number;
+}
+
+/**
+ * Batal bagi hasil — hapus seluruh `profit_distributions` proyek agar laba bisa
+ * dibagikan ulang (mis. salah tanggal/aturan atau nilai laba berubah usai koreksi).
+ * Proyek yang sudah `Ditutup` tetap `Ditutup`; proyek `Selesai` dikembalikan ke
+ * `Berjalan` agar bisa dioperasikan lagi.
+ */
+export async function cancelDistribution(
+  projectId: string,
+  actor: string,
+): Promise<CancelDistributeResult> {
+  if (!projectId) throw new AppError("Proyek wajib dipilih.");
+
+  const result = await db.transaction(async (tx) => {
+    const projectRows = await tx.select().from(projects).where(eq(projects.id, projectId)).limit(1);
+    const project = projectRows[0];
+    if (!project) throw new AppError("Proyek tidak ditemukan.");
+
+    const dists = await tx
+      .select()
+      .from(profitDistributions)
+      .where(eq(profitDistributions.projectId, projectId));
+    if (!dists.length) throw new AppError("Proyek ini belum dibagikan hasilnya.");
+
+    await tx.delete(profitDistributions).where(eq(profitDistributions.projectId, projectId));
+
+    if (project.status === STATUS.PROYEK_SELESAI) {
+      await tx.update(projects).set({ status: STATUS.PROYEK_BERJALAN }).where(eq(projects.id, projectId));
+    }
+
+    return { project: project.nama, jumlahBaris: dists.length };
+  });
+
+  await logAudit({
+    aksi: "CANCEL_DISTRIBUTE",
+    sheet: "Projects",
+    recordId: projectId,
+    detail: `Hapus ${result.jumlahBaris} baris bagi hasil`,
     user: actor,
   });
   return result;
@@ -270,18 +321,16 @@ export async function closeProject(
     }
     if (project.status === STATUS.PROYEK_DITUTUP) throw new AppError("Proyek sudah ditutup.");
 
-    // Baris selisih Ledger lama dibuang lebih dulu agar penilaian laba (syarat
-    // "bagi hasil dulu") hanya melihat transaksi manual; baris baru ditulis
-    // setelah pemeriksaan sehingga tutup-ulang oleh Admin tidak terhalang dan
-    // baris tidak menumpuk.
+    // Baris selisih Ledger lama dibuang lebih dulu agar tutup-ulang oleh Admin
+    // tidak menumpuk baris sistem; baris baru ditulis setelahnya. Bagi hasil
+    // tidak lagi diwajibkan sebelum tutup — Admin/Operator dapat membagikan
+    // hasil pada proyek yang sudah `Ditutup` (khususnya selisih Ledger yang
+    // baru diketahui saat penutupan).
     await tx
       .delete(projectTransactions)
       .where(and(eq(projectTransactions.projectId, projectId), eq(projectTransactions.sistem, true)));
 
     const totals = await computeTotalsFor(projectId, tx);
-    if (totals.laba !== 0 && !totals.sudahDibagikan) {
-      throw new AppError("Bagi hasil terlebih dahulu sebelum menutup proyek.");
-    }
 
     // Catat selisih Ledger (Debet − Kredit) sebagai transaksi proyek:
     // positif -> "Pendapatan", negatif -> "Kerugian" (jumlah selalu positif).
@@ -309,7 +358,8 @@ export async function closeProject(
       .set({ status: STATUS.PROYEK_DITUTUP, tanggalSelesaiAktual: todayStr() })
       .where(eq(projects.id, projectId));
 
-    return { nama: project.nama, laba: totals.laba, fundingId: project.fundingId };
+    // Laba final termasuk selisih Ledger yang baru saja dicatat.
+    return { nama: project.nama, laba: totals.laba + selisih, fundingId: project.fundingId };
   });
 
   // Notifikasi email ke investor pendana Funding proyek ini.

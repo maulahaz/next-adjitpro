@@ -35,6 +35,8 @@ export interface DashboardDTO {
   labaDibagikan: number;
   /** Total profit proyek berstatus `Ditutup` (investor: laba miliknya). */
   labaDitutup: number;
+  /** Laba proyek `Ditutup` yang belum dibagikan (0 untuk investor). */
+  labaBelumDibagikan: number;
   jumlahProyekDitutup: number;
   proyekAktif: number;
   jumlahInvestor: number;
@@ -75,6 +77,12 @@ export async function getDashboardScoped(session: SessionUser): Promise<Dashboar
         .reduce((s, d) => s + toNum(d.jumlahLaba), 0)
     : closed.reduce((s, p) => s + p.laba, 0);
 
+  // Laba proyek `Ditutup` yang belum dijalankan bagi hasilnya (pengingat
+  // Admin/Operator, karena penutupan tidak lagi mewajibkan bagi hasil).
+  const labaBelumDibagikan = isInvestor
+    ? 0
+    : closed.filter((p) => !p.sudahDibagikan).reduce((s, p) => s + p.laba, 0);
+
   const proyekAktif = projs.filter(
     (p) => p.status === STATUS.PROYEK_BERJALAN || p.status === STATUS.PROYEK_DRAFT,
   ).length;
@@ -87,6 +95,7 @@ export async function getDashboardScoped(session: SessionUser): Promise<Dashboar
     totalIdle,
     labaDibagikan,
     labaDitutup,
+    labaBelumDibagikan,
     jumlahProyekDitutup: closed.length,
     proyekAktif,
     jumlahInvestor: balances.length,

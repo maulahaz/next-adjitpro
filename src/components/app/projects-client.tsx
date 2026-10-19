@@ -87,6 +87,10 @@ export function ProjectsClient({
                 <Badge variant="secondary" className="text-[10px]">
                   dibagikan
                 </Badge>
+              ) : p.laba !== 0 ? (
+                <Badge variant="outline" className="text-[10px] text-amber-600">
+                  belum dibagikan
+                </Badge>
               ) : null}
             </div>
           </TableCell>

@@ -95,8 +95,9 @@ Sudah terinventarisasi di `Code.gs`, `Auth.gs`, `Projects.gs`, `Finance.gs`,
 - Tarik modal (`Tarik`) tidak boleh melebihi `idle`.
 - Penempatan modal (`addFunding`) tidak boleh melebihi `idle` investor.
 - Proyek `Ditutup` tidak boleh diubah / ditambahi funding / transaksi.
-- `distributeProfit`: tolak bila sudah dibagikan, modal ≤ 0, atau laba = 0.
-- `closeProject`: wajib dibagikan dulu bila laba ≠ 0.
+- `distributeProfit`: tolak bila sudah dibagikan, modal ≤ 0, atau laba = 0; **boleh** pada proyek `Ditutup` (status tetap `Ditutup`).
+- `closeProject`: **tidak** mewajibkan bagi hasil lebih dulu (admin/client); mencatat selisih Ledger + notifikasi email.
+- `cancelDistribution`: hapus seluruh baris bagi hasil proyek (admin/operator) agar bisa dibagikan ulang.
 - `deleteProject`: tolak bila sudah dibagikan.
 - Hapus investor: tolak bila punya transaksi modal/funding.
 - Hapus pihak ketiga: tolak bila dipakai proyek.

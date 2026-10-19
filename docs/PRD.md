@@ -125,9 +125,9 @@ Lihat §2.2 dan §15.
 | BR-7 | **Penarikan modal** tidak boleh melebihi **saldo idle** investor. |
 | BR-8 | **Kontribusi investor ke Funding** tidak boleh melebihi **saldo idle** investor. |
 | BR-9 | Proyek berstatus **`Ditutup` bersifat final** — tidak dapat diubah, tidak dapat ditambah transaksi, dan **Ledger-nya terkunci**. Admin dapat **membuka kembali** proyek untuk koreksi (status dipulihkan sesuai riwayat). |
-| BR-10 | Proyek berlaba **wajib dibagikan lebih dulu** sebelum dapat ditutup. |
-| BR-11 | Bagi hasil **hanya boleh sekali** per proyek. |
-| BR-12 | Bagi hasil hanya boleh dijalankan bila **alokasi budget proyek > 0**, **laba ≠ 0**, dan Funding sudah punya **kontribusi**. |
+| BR-10 | **Penutupan proyek tidak mewajibkan bagi hasil lebih dulu.** Client/Admin dapat menutup proyek lebih dulu; **Admin/Operator menjalankan bagi hasil setelahnya** (khususnya selisih Ledger yang baru diketahui saat penutupan). |
+| BR-11 | Bagi hasil **hanya boleh sekali** per proyek, kecuali dibatalkan lewat **Batal Bagi Hasil** (menghapus seluruh baris distribusi agar bisa diulang). |
+| BR-12 | Bagi hasil hanya boleh dijalankan bila **alokasi budget proyek > 0**, **laba ≠ 0**, dan Funding sudah punya **kontribusi**. Bagi hasil boleh dijalankan pada proyek `Ditutup` (statusnya tetap `Ditutup`). |
 | BR-13 | Proyek **berjalan atau yang sudah punya riwayat keuangan** (transaksi/ledger/bagi hasil) **tidak dapat dihapus**; hanya proyek `Draft` tanpa riwayat yang bisa dihapus. |
 | BR-14 | **Saldo idle** = modal pokok − modal terpakai (terpakai = kontribusi Funding berstatus `Aktif`). |
 | BR-15 | **Ekuitas investor** = modal pokok + laba yang telah diterima. |
@@ -136,9 +136,9 @@ Lihat §2.2 dan §15.
 | BR-18 | Format **ID** mempertahankan pola lama (`INV-0001`, `PRJ-0001`, …) dan wajib **unik serta atomik**. |
 | BR-19 | Zona waktu aplikasi **`Asia/Jakarta`**; tanggal `yyyy-MM-dd`, waktu `yyyy-MM-dd HH:mm:ss`. |
 | BR-20 | Setiap **proyek wajib** memiliki `funding_id`; satu Funding dimiliki **satu client** dan dapat membiayai **beberapa proyek**. Funding tidak bisa dihapus bila sudah dipakai proyek atau punya kontribusi. |
-| BR-21 | **Penutupan proyek** (admin/operator/client) menandai `Ditutup` + tanggal selesai aktual, mencatat **selisih Ledger** (`Debet − Kredit`) sebagai transaksi proyek otomatis (positif → `Pendapatan`, negatif → `Kerugian`; ikut menambah/mengurangi Laba), dan mengirim **notifikasi email** ke investor pendana Funding proyek tersebut (mode default `log`). |
+| BR-21 | **Penutupan proyek** (**admin/client**) menandai `Ditutup` + tanggal selesai aktual, mencatat **selisih Ledger** (`Debet − Kredit`) sebagai transaksi proyek otomatis (positif → `Pendapatan`, negatif → `Kerugian`; ikut menambah/mengurangi Laba), dan mengirim **notifikasi email** ke investor pendana Funding proyek tersebut (mode default `log`). |
 | BR-22 | **Siklus Funding**: `Draft` → `Komplit` (total kontribusi mencapai target, atau ditetapkan admin/operator) → `Release` (di-set manual admin/operator, syarat: status `Komplit` + aturan bagi hasil sudah dibuat) → `Berjalan` (dana dipakai proyek) → `Lunas` (pokok dikembalikan). Client **hanya boleh memilih Funding `Release` yang sudah punya aturan bagi hasil**; jumlah porsi investor + client wajib **tepat 100%**. |
-| BR-23 | **Siklus proyek**: proyek baru berstatus `Draft` dan menjadi `Berjalan` saat **entri Ledger pertama** ditambahkan; `Selesai` setelah bagi hasil; `Ditutup` setelah penutupan. |
+| BR-23 | **Siklus proyek**: proyek baru berstatus `Draft` dan menjadi `Berjalan` saat **entri Ledger pertama** ditambahkan; **Client/Admin menutup proyek** → `Ditutup`; bagi hasil menyusul kapan saja setelahnya (`Ditutup` tetap `Ditutup`, hanya `Berjalan` → `Selesai`). |
 
 ### 5.1 Algoritma pembagian laba (acuan contoh)
 
@@ -256,6 +256,7 @@ Kode persyaratan dipakai sebagai rujukan uji & pelacakan.
 | FR-DASH-04 | Bagi peran `investor`, seluruh angka **hanya** mencakup data dirinya. | Wajib |
 | FR-DASH-05 | Menampilkan **Total Profit proyek berstatus `Ditutup`** — admin/operator: total seluruh proyek; investor: laba miliknya dari proyek `Ditutup`. | Wajib |
 | FR-DASH-06 | Admin/operator melihat **daftar Funding** (dana terhimpun, target, jatuh tempo, status). | Wajib |
+| FR-DASH-07 | Admin/operator melihat **Laba Belum Dibagikan** (total laba proyek `Ditutup` yang belum dijalankan bagi hasil) sebagai pengingat. | Wajib |
 
 ### 7.5 Investor (`FR-INV`)
 
@@ -299,9 +300,10 @@ Kode persyaratan dipakai sebagai rujukan uji & pelacakan.
 | --- | --- | --- |
 | FR-DIST-01 | Menjalankan **Bagi Hasil** untuk satu proyek: laba dibagi pro-rata (BR-1, BR-2). | Wajib |
 | FR-DIST-02 | Menyimpan rincian per investor: porsi (%) dan jumlah laba. | Wajib |
-| FR-DIST-03 | Status proyek menjadi `Selesai` setelah dibagikan. | Wajib |
+| FR-DIST-03 | Status proyek menjadi `Selesai` setelah dibagikan; proyek yang sudah `Ditutup` **tetap `Ditutup`**. | Wajib |
 | FR-DIST-04 | Ditolak bila sudah pernah dibagikan, modal ≤ 0, atau laba = 0. | Wajib |
 | FR-DIST-05 | Halaman **Bagi Hasil**: riwayat pembagian per proyek per investor + total. | Wajib |
+| FR-DIST-06 | **Batal Bagi Hasil** (admin/operator): menghapus seluruh baris distribusi proyek agar laba dapat dibagikan ulang; proyek `Ditutup` tetap `Ditutup`, proyek `Selesai` kembali `Berjalan`. | Wajib |
 
 ### 7.9 Tutup proyek (`FR-CLOSE`)
 
@@ -309,8 +311,9 @@ Kode persyaratan dipakai sebagai rujukan uji & pelacakan.
 | --- | --- | --- |
 | FR-CLOSE-01 | Menutup proyek mengubah semua penempatan `Aktif` → `Dibebaskan` (modal kembali idle). | Wajib |
 | FR-CLOSE-02 | Status proyek menjadi `Ditutup` dan **tanggal selesai aktual** diisi. | Wajib |
-| FR-CLOSE-03 | Ditolak bila proyek berlaba belum dibagikan. | Wajib |
-| FR-CLOSE-04 | Penutupan bersifat final (BR-9). | Wajib |
+| FR-CLOSE-03 | Boleh dilakukan tanpa bagi hasil lebih dulu (BR-10); ditolak bila proyek sudah `Ditutup`. | Wajib |
+| FR-CLOSE-04 | Penutupan bersifat final (BR-9); Admin dapat membuka kembali untuk koreksi. | Wajib |
+| FR-CLOSE-05 | Hanya **admin** dan **client** (client hanya proyek miliknya) yang dapat menutup proyek; **operator** hanya menjalankan bagi hasil. | Wajib |
 
 ### 7.10 Mutasi modal (`FR-CAP`)
 
@@ -476,7 +479,8 @@ Kode persyaratan dipakai sebagai rujukan uji & pelacakan.
 | Bagi hasil ganda | `Proyek ini sudah pernah dibagikan hasilnya.` |
 | Modal proyek ≤ 0 | `Belum ada penempatan modal pada proyek ini.` |
 | Laba nol | `Laba proyek masih nol. Catat pendapatan/biaya terlebih dahulu.` |
-| Tutup sebelum bagi hasil | `Bagi hasil terlebih dahulu sebelum menutup proyek.` |
+| Batal bagi hasil tanpa data | `Proyek ini belum dibagikan hasilnya.` |
+| Tutup proyek ganda | `Proyek sudah ditutup.` |
 | Record tidak ditemukan | `Proyek tidak ditemukan.` / `Investor tidak ditemukan.` / `Transaksi tidak ditemukan.` / `Penempatan tidak ditemukan.` / `Pengguna tidak ditemukan.` |
 | Ledger tanpa proyek | `Proyek wajib dipilih.` |
 | Ledger nominal ≤ 0 | `Nominal harus lebih dari 0.` |
@@ -635,8 +639,8 @@ Rilis dinyatakan memenuhi syarat bila seluruh poin berikut terbukti.
 
 - [ ] Penarikan melebihi saldo idle **ditolak**.
 - [ ] Penempatan melebihi saldo idle **ditolak**.
-- [ ] Menutup proyek berlaba yang belum dibagikan **ditolak**.
-- [ ] Bagi hasil dua kali **ditolak**.
+- [ ] Menutup proyek berlaba **tanpa** bagi hasil **berhasil** (BR-10); bagi hasil menyusul pada proyek `Ditutup` dan statusnya **tetap `Ditutup`**.
+- [ ] Bagi hasil dua kali **ditolak**; **Batal Bagi Hasil** menghapus baris distribusi sehingga bisa dibagikan ulang.
 - [ ] Setelah proyek ditutup, seluruh penempatan menjadi `Dibebaskan` dan modal kembali idle.
 
 ### 12.3 Peran & keamanan
@@ -650,8 +654,8 @@ Rilis dinyatakan memenuhi syarat bila seluruh poin berikut terbukti.
 - [ ] Bagi hasil proyek memakai persen `invest_agreements` (total wajib **100%**); total bagian investor tepat sama dengan laba (largest remainder).
 - [ ] **Penutupan proyek** menandai `Ditutup`, mencatat selisih Ledger (`Debet − Kredit`) sebagai transaksi otomatis (`Pendapatan`/`Kerugian`) yang ikut dihitung pada Laba, dan memicu notifikasi email (mode `log`) ke investor pendana.
 - [ ] Proyek `Berjalan` atau yang punya riwayat keuangan **tidak dapat dihapus**.
-- [ ] Proyek `Ditutup` **mengunci Ledger**; **Admin** dapat membuka kembali proyek untuk koreksi.
-- [ ] Dashboard menampilkan **Total Profit proyek `Ditutup`** (investor: bagian miliknya) dan daftar **Funding** (admin/operator).
+- [ ] Proyek `Ditutup` **mengunci Ledger**; **Admin** dapat membuka kembali proyek untuk koreksi; **Operator** hanya menjalankan bagi hasil (tidak menutup/membuka).
+- [ ] Dashboard menampilkan **Total Profit proyek `Ditutup`**, **Laba Belum Dibagikan**, dan daftar **Funding** (admin/operator).
 - [ ] Admin **reset password** pengguna ke **`pass-123`**.
 - [ ] Ekspor CSV tanpa sesi sah **ditolak (401)**.
 - [ ] Terkunci setelah 5 percobaan gagal; akun nonaktif ditolak.

@@ -72,9 +72,14 @@ Gotchas:
   `counters` table (`src/lib/services/ids.ts`). Don't change the format or bypass `counters`.
 - `allocateProRata` uses largest-remainder rounding so the distributed total **always** equals the
   profit exactly; losses are negative and follow the same rule.
-- Lifecycle: fund a `Draft` project → `Berjalan`; distribute profit once (→ `Selesai`); a profitable
-  project must be distributed before `closeProject`; closing frees `project_funding`
-  (`Aktif` → `Dibebaskan`). Withdrawals/placements cannot exceed the investor's idle balance.
+- Lifecycle: a `Draft` project becomes `Berjalan` on the first Ledger entry; **Client** (or Admin)
+  closes it (`Ditutup`) when the work is done — `closeProject` books the Ledger difference
+  (`Debet − Kredit`) as a `sistem` transaction and emails the funding's investors. Closing no longer
+  requires prior distribution; **Admin/Operator distribute profit afterwards** and `distributeProfit`
+  accepts a `Ditutup` project (keeping it `Ditutup`; it only moves `Berjalan` → `Selesai`). Profit is
+  distributed once; `cancelDistribution` ("Batal Bagi Hasil") deletes the rows so it can be redone.
+  Only `[admin, client]` may close. Closing frees `project_funding` (`Aktif` → `Dibebaskan`).
+  Withdrawals/placements cannot exceed the investor's idle balance.
 - Legacy passwords (`sha256(salt + "::" + password)`) must keep verifying and auto-upgrade to bcrypt
   on successful login — preserve `legacyHashPassword` / `verifyPassword` semantics.
 - Role scoping is server-side: `investor` sees only their own data; `client` sees only its third

@@ -121,7 +121,7 @@ export function MyProjectsClient({
                     </Button>
                   }
                   title="Tutup Proyek"
-                  description="Setelah ditutup, seluruh investor pendana Funding proyek ini akan menerima notifikasi email. Proyek berlaba wajib dibagikan terlebih dahulu."
+                  description="Setelah ditutup, seluruh investor pendana Funding proyek ini akan menerima notifikasi email. Bagi hasil dilakukan Admin/Operator setelah proyek ditutup."
                   action={closeProjectAction}
                   submitLabel="Tutup Proyek"
                 >
