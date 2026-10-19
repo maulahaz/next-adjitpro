@@ -22,6 +22,8 @@ export interface ProjectTotals {
   modal: number;
   pendapatan: number;
   biaya: number;
+  /** Bagian rugi (baris otomatis selisih Ledger negatif) — pengurang laba. */
+  kerugian: number;
   laba: number;
   /** Jumlah baris pendanaan (sama dengan aplikasi lama). */
   jumlahInvestor: number;
@@ -44,11 +46,16 @@ export function computeProjectTotals(
     .filter((r) => r.tipe === TIPE.BIAYA)
     .reduce((s, r) => s + toNum(r.jumlah), 0);
 
+  const kerugian = transactions
+    .filter((r) => r.tipe === TIPE.KERUGIAN)
+    .reduce((s, r) => s + toNum(r.jumlah), 0);
+
   return {
     modal,
     pendapatan,
     biaya,
-    laba: pendapatan - biaya,
+    kerugian,
+    laba: pendapatan - biaya - kerugian,
     jumlahInvestor: fundings.length,
     sudahDibagikan: distributions.length > 0,
     totalDibagikan: distributions.reduce((s, r) => s + toNum(r.jumlahLaba), 0),

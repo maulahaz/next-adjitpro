@@ -64,6 +64,11 @@ export const TIPE = {
   TARIK: "Tarik",
   PENDAPATAN: "Pendapatan",
   BIAYA: "Biaya",
+  /**
+   * Hanya dipakai baris otomatis hasil penutupan proyek (selisih Ledger
+   * `Debet − Kredit` yang negatif). Bukan pilihan pada form transaksi.
+   */
+  KERUGIAN: "Kerugian",
 } as const;
 
 /** Jenis entri ledger proyek (fitur baru; tidak ada di aplikasi lama). */

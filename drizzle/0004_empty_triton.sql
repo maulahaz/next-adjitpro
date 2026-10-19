@@ -1,0 +1,1 @@
+ALTER TABLE "project_transactions" ADD COLUMN "sistem" boolean DEFAULT false NOT NULL;

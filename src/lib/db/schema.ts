@@ -9,6 +9,7 @@
 
 import {
   bigint,
+  boolean,
   date,
   index,
   integer,
@@ -240,10 +241,15 @@ export const projectTransactions = pgTable(
     id: text("id").primaryKey(),
     projectId: text("project_id").notNull(),
     tanggal: date("tanggal"),
-    /** 'Pendapatan' | 'Biaya' */
+    /** 'Pendapatan' | 'Biaya' | 'Kerugian' */
     tipe: text("tipe").notNull(),
     jumlah: bigint("jumlah", { mode: "number" }).notNull().default(0),
     keterangan: text("keterangan").notNull().default(""),
+    /**
+     * Baris otomatis (mis. selisih Ledger saat proyek ditutup). Tetap dihitung
+     * pada total/laba proyek, tetapi tidak dapat dihapus manual.
+     */
+    sistem: boolean("sistem").notNull().default(false),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => ({ projectIdx: index("ptx_project_idx").on(t.projectId) }),

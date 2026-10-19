@@ -4,7 +4,7 @@
  * memakai `invest_agreements` (persen) dan kontribusi Funding (pro-rata).
  */
 
-import { asc, eq } from "drizzle-orm";
+import { and, asc, eq } from "drizzle-orm";
 import { db, type DbOrTx } from "@/lib/db";
 import {
   capitalTransactions,
@@ -12,12 +12,15 @@ import {
   fundings,
   investAgreements,
   investors,
+  projectLedgers,
+  projectTransactions,
   projects,
   profitDistributions,
 } from "@/lib/db/schema";
 import { LOSS_RULE, STATUS, TIPE } from "@/lib/constants";
 import { todayStr, toDateString } from "@/lib/domain/dates";
 import { splitProjectProfit } from "@/lib/domain/funding-split";
+import { computeLedgerTotals } from "@/lib/domain/ledger-totals";
 import { parseMoneyInput, toNum } from "@/lib/domain/money";
 import { AppError } from "@/lib/errors";
 import { logAudit } from "./audit";
@@ -267,9 +270,38 @@ export async function closeProject(
     }
     if (project.status === STATUS.PROYEK_DITUTUP) throw new AppError("Proyek sudah ditutup.");
 
+    // Baris selisih Ledger lama dibuang lebih dulu agar penilaian laba (syarat
+    // "bagi hasil dulu") hanya melihat transaksi manual; baris baru ditulis
+    // setelah pemeriksaan sehingga tutup-ulang oleh Admin tidak terhalang dan
+    // baris tidak menumpuk.
+    await tx
+      .delete(projectTransactions)
+      .where(and(eq(projectTransactions.projectId, projectId), eq(projectTransactions.sistem, true)));
+
     const totals = await computeTotalsFor(projectId, tx);
     if (totals.laba !== 0 && !totals.sudahDibagikan) {
       throw new AppError("Bagi hasil terlebih dahulu sebelum menutup proyek.");
+    }
+
+    // Catat selisih Ledger (Debet − Kredit) sebagai transaksi proyek:
+    // positif -> "Pendapatan", negatif -> "Kerugian" (jumlah selalu positif).
+    // Baris bertanda `sistem` (tidak bisa dihapus manual) dan IKUT dihitung
+    // pada total/laba proyek.
+    const ledgerRows = await tx
+      .select({ jenis: projectLedgers.jenis, nominal: projectLedgers.nominal })
+      .from(projectLedgers)
+      .where(eq(projectLedgers.projectId, projectId));
+    const selisih = computeLedgerTotals(ledgerRows).selisih;
+    if (selisih !== 0) {
+      await tx.insert(projectTransactions).values({
+        id: await nextId("ProjectTransactions", tx),
+        projectId,
+        tanggal: todayStr(),
+        tipe: selisih > 0 ? TIPE.PENDAPATAN : TIPE.KERUGIAN,
+        jumlah: Math.abs(selisih),
+        keterangan: "Selisih Ledger saat penutupan proyek",
+        sistem: true,
+      });
     }
 
     await tx

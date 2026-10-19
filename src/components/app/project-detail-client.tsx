@@ -29,10 +29,13 @@ const TIPE_OPTIONS = [
 export function ProjectDetailClient({
   detail,
   canWrite,
+  isAdmin = false,
 }: {
   detail: ProjectDetailDTO;
   /** `false` untuk peran read-only (investor) — menyembunyikan seluruh aksi tulis. */
   canWrite: boolean;
+  /** Hanya admin yang boleh membuka kembali proyek `Ditutup`. */
+  isAdmin?: boolean;
 }) {
   const { project, totals, funding, agreement, contributions, transactions, distributions, ledgers } = detail;
 
@@ -69,7 +72,7 @@ export function ProjectDetailClient({
           ) : null}
         </div>
 
-        {locked && canWrite ? (
+        {locked && isAdmin ? (
           <div className="flex flex-wrap gap-2">
             <FormDialog
               trigger={
@@ -158,6 +161,13 @@ export function ProjectDetailClient({
           tone={totals.laba < 0 ? "negative" : "positive"}
           sub={sudahDibagikan ? `Sudah dibagikan: ${formatRupiah(totals.totalDibagikan)}` : "Belum dibagikan"}
         />
+        {totals.kerugian > 0 ? (
+          <StatCard
+            label="Kerugian (selisih Ledger)"
+            value={formatRupiah(totals.kerugian)}
+            tone="negative"
+          />
+        ) : null}
       </div>
 
       {/* Funding & Kontribusi */}
@@ -288,25 +298,31 @@ export function ProjectDetailClient({
                 </TableCell>
                 <TableCell className="text-muted-foreground">{t.keterangan || "-"}</TableCell>
                 <TableCell
-                  className={`text-right tabular-nums ${t.tipe === "Biaya" ? "text-destructive" : "text-success"}`}
+                  className={`text-right tabular-nums ${
+                    t.tipe === "Biaya" || t.tipe === "Kerugian" ? "text-destructive" : "text-success"
+                  }`}
                 >
                   {formatRupiah(t.jumlah)}
                 </TableCell>
                 {canEdit ? (
                   <TableCell>
-                    <div className="flex justify-end">
-                      <ConfirmDialog
-                        trigger={
-                          <Button variant="ghost" size="icon" aria-label="Hapus" className="text-destructive">
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        }
-                        title="Hapus Transaksi"
-                        description={`Hapus transaksi ${t.tipe} ${formatRupiah(t.jumlah)}?`}
-                        action={deleteProjectTransactionAction}
-                        hidden={{ id: t.id, projectId: project.id }}
-                      />
-                    </div>
+                    {t.sistem ? (
+                      <div className="text-right text-xs text-muted-foreground">otomatis</div>
+                    ) : (
+                      <div className="flex justify-end">
+                        <ConfirmDialog
+                          trigger={
+                            <Button variant="ghost" size="icon" aria-label="Hapus" className="text-destructive">
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          }
+                          title="Hapus Transaksi"
+                          description={`Hapus transaksi ${t.tipe} ${formatRupiah(t.jumlah)}?`}
+                          action={deleteProjectTransactionAction}
+                          hidden={{ id: t.id, projectId: project.id }}
+                        />
+                      </div>
+                    )}
                   </TableCell>
                 ) : null}
               </TableRow>
@@ -360,14 +376,27 @@ export function ProjectDetailClient({
               );
             })}
             footer={
-              <TableRow>
-                <TableCell colSpan={3} className="text-right">
-                  Total
-                </TableCell>
-                <TableCell className="text-right tabular-nums">{formatRupiah(ledgerTotals.debet)}</TableCell>
-                <TableCell className="text-right tabular-nums">{formatRupiah(ledgerTotals.kredit)}</TableCell>
-                <TableCell />
-              </TableRow>
+              <>
+                <TableRow>
+                  <TableCell colSpan={3} className="text-right">
+                    Total
+                  </TableCell>
+                  <TableCell className="text-right tabular-nums">{formatRupiah(ledgerTotals.debet)}</TableCell>
+                  <TableCell className="text-right tabular-nums">{formatRupiah(ledgerTotals.kredit)}</TableCell>
+                  <TableCell />
+                </TableRow>
+                <TableRow>
+                  <TableCell colSpan={3} className="text-right font-semibold">
+                    PROFIT (Debet − Kredit)
+                  </TableCell>
+                  <TableCell colSpan={2} className="text-right font-semibold tabular-nums">
+                    <span className={ledgerTotals.selisih < 0 ? "text-destructive" : "text-success"}>
+                      {formatRupiah(ledgerTotals.selisih)}
+                    </span>
+                  </TableCell>
+                  <TableCell />
+                </TableRow>
+              </>
             }
           />
         </CardContent>

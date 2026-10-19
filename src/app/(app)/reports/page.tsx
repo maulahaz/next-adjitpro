@@ -73,10 +73,10 @@ export default async function ReportsPage() {
               head={
                 <TableRow>
                   <TableHead>Funding</TableHead>
-                  <TableHead>Pihak Ketiga</TableHead>
+                  <TableHead>Mitra</TableHead>
                   <TableHead className="text-right">Kontribusi Saya</TableHead>
                   <TableHead className="text-right">Laba Saya</TableHead>
-                  <TableHead>TotalProyek</TableHead>
+                  <TableHead>Proyek</TableHead>
                   <TableHead>Jatuh Tempo</TableHead>
                   <TableHead>Status</TableHead>
                 </TableRow>
@@ -175,7 +175,7 @@ export default async function ReportsPage() {
               <TableRow>
                 <TableHead>ID</TableHead>
                 <TableHead>Proyek</TableHead>
-                <TableHead>Pihak Ketiga</TableHead>
+                <TableHead>Mitra</TableHead>
                 <TableHead>Periode</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead className="text-right">Modal</TableHead>

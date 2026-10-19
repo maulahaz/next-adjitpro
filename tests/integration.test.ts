@@ -21,6 +21,7 @@ import {
   saveProject,
   addProjectTransaction,
   listProjectsEnriched,
+  getProjectDetail,
   deleteProject,
   reopenProject,
   investorFundsProject,
@@ -591,6 +592,84 @@ describe.skipIf(!hasDb)("integrasi: ledger proyek (client)", () => {
         { thirdPartyId: tp.id },
       ),
     ).resolves.toBeTruthy();
+  });
+
+  it("penutupan proyek mencatat selisih Ledger (+) sebagai Pendapatan", async () => {
+    const tp = await saveThirdParty({ nama: "PT Selisih" }, "test");
+    const funding = await makeFunding(tp.id, "Funding Selisih");
+    const project = await saveProject(
+      { nama: "Proyek Selisih", fundingId: funding.id, pihakKetigaId: tp.id, alokasiBudget: 1000000 },
+      "test",
+    );
+    // Debet 5jt, Kredit 2jt -> selisih +3jt -> "Pendapatan".
+    await saveProjectLedger(
+      { projectId: project.id, jenis: "Debet", nominal: 5000000 },
+      "client1",
+      { thirdPartyId: tp.id },
+    );
+    await saveProjectLedger(
+      { projectId: project.id, jenis: "Kredit", nominal: 2000000 },
+      "client1",
+      { thirdPartyId: tp.id },
+    );
+
+    // Laba proyek 0 -> boleh ditutup tanpa bagi hasil.
+    await closeProject(project.id, "test");
+
+    const detail = await getProjectDetail(project.id);
+    const auto = detail.transactions.filter((t) => t.sistem);
+    expect(auto).toHaveLength(1);
+    expect(auto[0].tipe).toBe("Pendapatan");
+    expect(auto[0].jumlah).toBe(3000000);
+    expect(auto[0].keterangan).toMatch(/Selisih Ledger/);
+    // Selisih Ledger menjadi bagian Laba proyek.
+    expect(detail.totals.pendapatan).toBe(3000000);
+    expect(detail.totals.biaya).toBe(0);
+    expect(detail.totals.laba).toBe(3000000);
+  });
+
+  it("selisih Ledger (−) dicatat sebagai Kerugian; tutup ulang tidak menumpuk", async () => {
+    const tp = await saveThirdParty({ nama: "PT Rugi" }, "test");
+    const funding = await makeFunding(tp.id, "Funding Rugi");
+    const project = await saveProject(
+      { nama: "Proyek Rugi", fundingId: funding.id, pihakKetigaId: tp.id, alokasiBudget: 1000000 },
+      "test",
+    );
+    await saveProjectLedger(
+      { projectId: project.id, jenis: "Debet", nominal: 1000000 },
+      "client1",
+      { thirdPartyId: tp.id },
+    );
+    await saveProjectLedger(
+      { projectId: project.id, jenis: "Kredit", nominal: 3000000 },
+      "client1",
+      { thirdPartyId: tp.id },
+    );
+
+    await closeProject(project.id, "test");
+    let detail = await getProjectDetail(project.id);
+    let auto = detail.transactions.filter((t) => t.sistem);
+    expect(auto).toHaveLength(1);
+    expect(auto[0].tipe).toBe("Kerugian");
+    expect(auto[0].jumlah).toBe(2000000); // jumlah selalu positif
+    expect(detail.totals.kerugian).toBe(2000000);
+    expect(detail.totals.laba).toBe(-2000000);
+
+    // Buka kembali, ubah Ledger, lalu tutup ulang -> tetap satu baris sistem.
+    await reopenProject(project.id, "admin");
+    await saveProjectLedger(
+      { projectId: project.id, jenis: "Kredit", nominal: 500000 },
+      "client1",
+      { thirdPartyId: tp.id },
+    );
+    await closeProject(project.id, "test");
+    detail = await getProjectDetail(project.id);
+    auto = detail.transactions.filter((t) => t.sistem);
+    expect(auto).toHaveLength(1);
+    // Debet 1jt − Kredit 3.5jt = −2.5jt.
+    expect(auto[0].tipe).toBe("Kerugian");
+    expect(auto[0].jumlah).toBe(2500000);
+    expect(detail.totals.laba).toBe(-2500000);
   });
 });
 

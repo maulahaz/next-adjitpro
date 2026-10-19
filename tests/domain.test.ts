@@ -140,6 +140,22 @@ describe("computeProjectTotals", () => {
     expect(sudah.totalDibagikan).toBe(10);
   });
 
+  it("menghitung Kerugian sebagai pengurang laba", () => {
+    const totals = computeProjectTotals(
+      [{ jumlah: 100 }],
+      [
+        { tipe: "Pendapatan", jumlah: 500 },
+        { tipe: "Biaya", jumlah: 120 },
+        { tipe: "Kerugian", jumlah: 80 },
+      ],
+      [],
+    );
+    expect(totals.pendapatan).toBe(500);
+    expect(totals.biaya).toBe(120);
+    expect(totals.kerugian).toBe(80);
+    expect(totals.laba).toBe(300);
+  });
+
   it("aggregateFundingByInvestor menggabungkan penempatan berganda", () => {
     const map = aggregateFundingByInvestor([
       { investorId: "A", jumlah: 100 },

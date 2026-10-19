@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { DollarSign, Pencil, Plus, RotateCcw, Trash2 } from "lucide-react";
+import { Eye, Pencil, Plus, RotateCcw, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -98,7 +98,7 @@ export function ProjectsClient({
             <div className="flex justify-end gap-1">
               <Button asChild variant="ghost" size="sm">
                 <Link href={`/projects/${p.id}`}>
-                  <DollarSign className="h-4 w-4" />{" "}
+                  <Eye className="h-4 w-4" />{" "}
                 </Link>
               </Button>
               {canWrite ? (

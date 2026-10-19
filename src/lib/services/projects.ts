@@ -86,6 +86,8 @@ export interface ProjectTransactionDTO {
   tipe: string;
   jumlah: number;
   keterangan: string;
+  /** Baris otomatis (selisih Ledger saat penutupan) — tidak bisa dihapus manual. */
+  sistem: boolean;
 }
 
 export interface DistributionDTO {
@@ -475,6 +477,7 @@ export async function getProjectDetail(projectId: string): Promise<ProjectDetail
       tipe: t.tipe,
       jumlah: toNum(t.jumlah),
       keterangan: t.keterangan,
+      sistem: Boolean(t.sistem),
     })),
     distributions: distRows.map((d) => ({
       id: d.id,
@@ -530,6 +533,9 @@ export async function deleteProjectTransaction(id: string, actor: string): Promi
   const rows = await db.select().from(projectTransactions).where(eq(projectTransactions.id, id)).limit(1);
   const t = rows[0];
   if (!t) throw new AppError("Transaksi tidak ditemukan.");
+  if (t.sistem) {
+    throw new AppError("Transaksi otomatis (selisih Ledger) tidak bisa dihapus.");
+  }
 
   const totals = await computeTotalsFor(t.projectId);
   if (totals.sudahDibagikan) {

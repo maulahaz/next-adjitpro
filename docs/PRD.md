@@ -136,7 +136,7 @@ Lihat §2.2 dan §15.
 | BR-18 | Format **ID** mempertahankan pola lama (`INV-0001`, `PRJ-0001`, …) dan wajib **unik serta atomik**. |
 | BR-19 | Zona waktu aplikasi **`Asia/Jakarta`**; tanggal `yyyy-MM-dd`, waktu `yyyy-MM-dd HH:mm:ss`. |
 | BR-20 | Setiap **proyek wajib** memiliki `funding_id`; satu Funding dimiliki **satu client** dan dapat membiayai **beberapa proyek**. Funding tidak bisa dihapus bila sudah dipakai proyek atau punya kontribusi. |
-| BR-21 | **Penutupan proyek** (admin/operator/client) menandai `Ditutup` + tanggal selesai aktual, dan mengirim **notifikasi email** ke investor pendana Funding proyek tersebut (mode default `log`). |
+| BR-21 | **Penutupan proyek** (admin/operator/client) menandai `Ditutup` + tanggal selesai aktual, mencatat **selisih Ledger** (`Debet − Kredit`) sebagai transaksi proyek otomatis (positif → `Pendapatan`, negatif → `Kerugian`; ikut menambah/mengurangi Laba), dan mengirim **notifikasi email** ke investor pendana Funding proyek tersebut (mode default `log`). |
 | BR-22 | **Siklus Funding**: `Draft` → `Komplit` (total kontribusi mencapai target, atau ditetapkan admin/operator) → `Release` (di-set manual admin/operator, syarat: status `Komplit` + aturan bagi hasil sudah dibuat) → `Berjalan` (dana dipakai proyek) → `Lunas` (pokok dikembalikan). Client **hanya boleh memilih Funding `Release` yang sudah punya aturan bagi hasil**; jumlah porsi investor + client wajib **tepat 100%**. |
 | BR-23 | **Siklus proyek**: proyek baru berstatus `Draft` dan menjadi `Berjalan` saat **entri Ledger pertama** ditambahkan; `Selesai` setelah bagi hasil; `Ditutup` setelah penutupan. |
 
@@ -284,7 +284,7 @@ Kode persyaratan dipakai sebagai rujukan uji & pelacakan.
 | FR-PRJ-04 | Penambahan penempatan modal divalidasi terhadap saldo idle investor. | Wajib |
 | FR-PRJ-05 | **Alokasi budget wajib diisi**; proyek baru selalu berstatus `Draft` dan menjadi `Berjalan` saat **entri Ledger pertama** ditambahkan. | Wajib |
 | FR-PRJ-06 | Penempatan modal dapat dihapus (ditolak bila proyek sudah dibagikan/ditutup). | Wajib |
-| FR-PRJ-07 | Transaksi proyek **Pendapatan**/**Biaya** dapat ditambah & dihapus. | Wajib |
+| FR-PRJ-07 | Transaksi proyek **Pendapatan**/**Biaya** dapat ditambah & dihapus. **Penutupan proyek** menambah satu baris otomatis **`Pendapatan`**/**`Kerugian`** (selisih Ledger) yang tidak dapat dihapus manual dan **ikut dihitung** pada Laba proyek. | Wajib |
 | FR-PRJ-08 | **Penghapusan proyek** hanya boleh untuk proyek `Draft` **tanpa riwayat keuangan** (transaksi/ledger/bagi hasil) — menjaga jejak audit. | Wajib |
 | FR-PRJ-09 | Proyek `Ditutup` tidak dapat diubah dan **Ledger-nya terkunci (read-only)**. | Wajib |
 | FR-PRJ-10 | Buat/ubah/hapus proyek diizinkan untuk peran **`admin`** (semua proyek) dan **`client`** (hanya proyek miliknya); **operator & investor read-only**. | Wajib |
@@ -371,6 +371,7 @@ Kode persyaratan dipakai sebagai rujukan uji & pelacakan.
 | FR-LEDGER-04 | Client **ditolak** melakukan CRUD pada proyek milik pihak ketiga lain (ditegakkan di server). | Wajib |
 | FR-LEDGER-05 | Nominal wajib **> 0**; jenis di luar `Debet`/`Kredit` dikembalikan ke nilai aman (`Debet`); tanggal kosong memakai tanggal hari ini. | Wajib |
 | FR-LEDGER-06 | Halaman ledger menampilkan tabel kolom **No, Tanggal, Deskripsi, Debet, Kredit, Keterangan**, dengan ringkasan **total Debet** & **total Kredit** di baris Total. Nilai `nominal` masuk kolom **Debet** (jenis `Debet`) atau **Kredit** (jenis `Kredit`). | Wajib |
+| FR-LEDGER-07 | Saat proyek **ditutup**, selisih Ledger (`Debet − Kredit`) dicatat otomatis sebagai **transaksi proyek** (`project_transactions`): positif → tipe `Pendapatan`, negatif → tipe `Kerugian`; `jumlah` selalu positif. Baris bertanda **sistem** (tidak bisa dihapus manual) dan **ikut menambah/mengurangi Laba** proyek, sehingga laba proyek `Ditutup` mencerminkan hasil Ledger. Baris diperbarui (bukan menumpuk) bila proyek dibuka kembali lalu ditutup ulang. | Wajib |
 
 ### 7.16 Standar tampilan tabel (`FR-UI-TABLE`) — standar v1.4
 
@@ -564,7 +565,7 @@ Kode persyaratan dipakai sebagai rujukan uji & pelacakan.
 | `projects` | Master proyek + status + tanggal + **`funding_id` (wajib)** + `alokasi_budget` |
 | `capital_transactions` | Setoran / penarikan modal |
 | `project_funding` | **Dorman** — penempatan modal model lama, tidak dipakai kode (arsip) |
-| `project_transactions` | Pendapatan / biaya proyek |
+| `project_transactions` | Pendapatan / biaya proyek (+ baris otomatis `Pendapatan`/`Kerugian` bertanda *sistem* saat penutupan, ikut dihitung pada Laba) |
 | `profit_distributions` | Hasil bagi laba per investor (porsi + jumlah, + `funding_id` untuk jejak) |
 | `project_ledgers` | **Ledger proyek** (tanggal, deskripsi, jenis Debet/Kredit, nominal, keterangan) — fitur baru v1.1 |
 | `audit_log` | Jejak audit aktivitas |
@@ -647,7 +648,7 @@ Rilis dinyatakan memenuhi syarat bila seluruh poin berikut terbukti.
 - [ ] Proyek baru berstatus `Draft` → menjadi `Berjalan` saat **entri Ledger pertama** ditambahkan.
 - [ ] Operator mencatat **kontribusi Funding** → saldo idle investor berkurang (terpakai); pengembalian pokok melepas idle dan Funding menjadi `Lunas`.
 - [ ] Bagi hasil proyek memakai persen `invest_agreements` (total wajib **100%**); total bagian investor tepat sama dengan laba (largest remainder).
-- [ ] **Penutupan proyek** menandai `Ditutup` dan memicu notifikasi email (mode `log`) ke investor pendana.
+- [ ] **Penutupan proyek** menandai `Ditutup`, mencatat selisih Ledger (`Debet − Kredit`) sebagai transaksi otomatis (`Pendapatan`/`Kerugian`) yang ikut dihitung pada Laba, dan memicu notifikasi email (mode `log`) ke investor pendana.
 - [ ] Proyek `Berjalan` atau yang punya riwayat keuangan **tidak dapat dihapus**.
 - [ ] Proyek `Ditutup` **mengunci Ledger**; **Admin** dapat membuka kembali proyek untuk koreksi.
 - [ ] Dashboard menampilkan **Total Profit proyek `Ditutup`** (investor: bagian miliknya) dan daftar **Funding** (admin/operator).

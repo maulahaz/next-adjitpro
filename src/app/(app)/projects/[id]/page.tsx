@@ -27,5 +27,11 @@ export default async function ProjectDetailPage({
   }
 
   const write = canWrite(user.role);
-  return <ProjectDetailClient detail={detail} canWrite={write} />;
+  return (
+    <ProjectDetailClient
+      detail={detail}
+      canWrite={write}
+      isAdmin={user.role === "admin"}
+    />
+  );
 }

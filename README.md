@@ -18,7 +18,7 @@
 | **Laporan** | Rekap investor, rekap proyek, riwayat bagi hasil, **export CSV**, dan **cetak**. Investor melihat versi ter-scope + **Ringkasan Funding** yang ia ikuti. |
 | **Pengguna** | Kelola akun (khusus admin): peran, tautan ke investor/pihak ketiga, **reset password ke `pass-123`**, aktif/nonaktif. |
 | **Kartu Saya** | Halaman investor: statement dirinya sendiri + **ringkasan Funding**. |
-| **Proyek Saya** | Halaman client: daftar proyek milik pihak ketiganya (kolom Funding menampilkan **nama + total dana terhimpun**). Client dapat **menambah/mengubah/menghapus proyeknya** (wajib memilih Funding `Release` beraturan hasil + wajib mengisi Alokasi Budget), **menutup proyek** yang selesai (memicu notifikasi email ke investor), dan membuka **Buka Ledger** per proyek. Proyek `Ditutup` hanya bisa dibaca. |
+| **Proyek Saya** | Halaman client: daftar proyek milik pihak ketiganya (kolom Funding menampilkan **nama + total dana terhimpun**). Client dapat **menambah/mengubah/menghapus proyeknya** (wajib memilih Funding `Release` beraturan hasil + wajib mengisi Alokasi Budget), **menutup proyek** yang selesai (memicu notifikasi email ke investor + mencatat **selisih Ledger** sebagai transaksi otomatis), dan membuka **Buka Ledger** per proyek. Proyek `Ditutup` hanya bisa dibaca. |
 | **Ledger Proyek** | Ledger **Debet/Kredit** per proyek. Ditampilkan sebagai tabel **No · Tanggal · Deskripsi · Debet · Kredit · Keterangan** (nilai masuk ke kolom Debet/Kredit sesuai jenis) dengan baris **Total**. **Hanya peran `client`** yang dapat menambah/ubah/menghapus entri — dan hanya untuk proyek milik pihak ketiganya. Peran lain hanya **membaca** (read-only) di detail proyek; Ledger **terkunci** saat proyek `Ditutup` (admin dapat membuka kembali proyek). |
 | **Ganti Password** | Setiap pengguna dapat mengganti password sendiri (wajib tahu password lama). |
 
@@ -51,7 +51,11 @@
     dikembalikan). **Client hanya boleh memilih Funding `Release`**; jumlah porsi investor +
     client wajib **tepat 100%**; jatuh tempo bagi hasil = **N bulan** setelah jatuh tempo Funding.
 11. **Siklus proyek**: proyek baru berstatus `Draft` dan menjadi `Berjalan` saat **entri Ledger
-    pertama** ditambahkan → `Selesai` setelah bagi hasil → `Ditutup` setelah penutupan.
+    pertama** ditambahkan → `Selesai` setelah bagi hasil → `Ditutup` setelah penutupan. Saat
+    **penutupan**, selisih Ledger (`Debet − Kredit`) dicatat sebagai **transaksi proyek**
+    otomatis: positif → `Pendapatan`, negatif → `Kerugian` (jumlah selalu positif). Baris ini
+    bertanda *sistem* (tidak bisa dihapus manual) dan **ikut menambah/mengurangi Laba** proyek,
+    sehingga proyek `Ditutup` menampilkan Laba dari hasil Ledger-nya.
 12. Proyek `Ditutup` **mengunci Ledger** (hanya baca); **admin** dapat **membuka kembali** proyek
     untuk koreksi (status dipulihkan sesuai riwayat). Dashboard menampilkan **Total Profit proyek
     `Ditutup`** dan daftar **Funding** (admin/operator).
@@ -207,7 +211,7 @@ Perbedaan teknis yang disengaja:
 ## 6. Pengujian
 
 ```powershell
-npm test          # 51 uji: 32 logika murni + 19 integrasi PostgreSQL
+npm test          # 54 uji: 33 logika murni + 21 integrasi PostgreSQL
 ```
 
 Uji integrasi otomatis dilewati bila `DATABASE_URL` tidak tersedia, sehingga
