@@ -81,7 +81,7 @@ export function ThirdPartiesClient({ thirdParties }: { thirdParties: ThirdPartyD
                   </Button>
                 }
                 title="Hapus Pihak Ketiga"
-                description={`Hapus ${t.nama}? Tidak bisa dihapus bila dipakai pada proyek atau funding.`}
+                description={`Hapus ${t.nama}?. Data Tidak bisa dihapus bila dipakai pada proyek atau funding.`}
                 action={deleteThirdPartyAction}
                 hidden={{ id: t.id }}
               />

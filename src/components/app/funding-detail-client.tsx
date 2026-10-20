@@ -148,7 +148,7 @@ export function FundingDetailClient({
                 <FileText className="h-4 w-4" /> {agreement ? "Ubah Aturan" : "Buat Aturan Bagi Hasil"}
               </Button>
             }
-            title="Aturan Bagi Hasil (invest_agreements)"
+            title="Aturan Bagi Hasil"
             description="Persentase laba untuk investor dan client. Bagian investor dibagi pro-rata ke kontributor funding."
             action={saveAgreementAction}
           >

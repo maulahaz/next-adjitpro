@@ -19,10 +19,10 @@ import type { InvestorDTO } from "@/lib/services/investors";
 import type { ThirdPartyDTO } from "@/lib/services/third-parties";
 
 const ROLE_OPTIONS = [
-  { value: "admin", label: "Admin (akses penuh + kelola pengguna)" },
+  { value: "admin", label: "Admin (akses penuh)" },
   { value: "operator", label: "Operator (input data)" },
-  { value: "investor", label: "Investor (hanya data sendiri)" },
-  { value: "client", label: "Client (Pihak Ketiga)" },
+  { value: "investor", label: "Investor (pemodal)" },
+  { value: "client", label: "Client (mitra/pihak ketiga)" },
 ];
 
 const STATUS_OPTIONS = [
@@ -116,8 +116,8 @@ export function UsersClient({
                     <KeyRound className="h-4 w-4" />
                   </Button>
                 }
-                title={`Reset Password — ${u.username}`}
-                description={`Reset password ${u.username} ke "${DEFAULT_RESET_PASSWORD}"? Pengguna dapat menggantinya nanti lewat menu Ganti Password.`}
+                title={`Reset Password`}
+                description={`Reset password user: "${u.username}" ke "${DEFAULT_RESET_PASSWORD}"? . Pengguna dapat menggantinya nanti lewat menu Ganti Password.`}
                 action={resetUserPasswordAction}
                 confirmLabel="Reset Password"
                 hidden={{ id: u.id }}

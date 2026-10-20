@@ -19,7 +19,7 @@ export default async function UsersPage() {
     <div>
       <PageHeader
         title="Pengguna"
-        description="Kelola akun login. Peran investor wajib ditautkan ke data investor; peran client wajib ditautkan ke pihak ketiga."
+        description="Kelola akun login."
       />
       <UsersClient
         users={users}

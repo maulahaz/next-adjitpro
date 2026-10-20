@@ -16,7 +16,7 @@ export function ChangePasswordForm() {
     <Card className="max-w-md">
       <CardHeader>
         <CardTitle>Ganti Password</CardTitle>
-        <CardDescription>Masukkan password lama dan password baru Anda (minimal 6 karakter).</CardDescription>
+        {/* <CardDescription>Masukkan password lama dan password baru Anda (minimal 6 karakter).</CardDescription> */}
       </CardHeader>
       <CardContent>
         <form action={formAction} className="space-y-4">

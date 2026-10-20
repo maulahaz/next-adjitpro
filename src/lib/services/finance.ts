@@ -303,7 +303,7 @@ export interface CloseResult {
 /**
  * Tutup proyek: proyek berlaba wajib dibagikan dulu. Setelah ditutup, seluruh
  * investor pendana Funding proyek ini menerima notifikasi email.
- * Boleh dilakukan admin/operator maupun client (dengan `scope`).
+ * Hanya bisa dilakukan oleh client (dengan `scope`).
  */
 export async function closeProject(
   projectId: string,
