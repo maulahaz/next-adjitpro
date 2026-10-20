@@ -86,7 +86,7 @@ export function AppShell({ user, children }: { user: ShellUser; children: React.
         <main className="flex-1 p-4 lg:p-6">{children}</main>
 
         <footer className="border-t px-4 py-3 text-center text-xs text-muted-foreground lg:px-6">
-          AdjitPro — Aplikasi Pencatatan Keuangan Investasi
+          AdjitPro — Aplikasi Pencatatan Investasi
         </footer>
       </div>
     </div>

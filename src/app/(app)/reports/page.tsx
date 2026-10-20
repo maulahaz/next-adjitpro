@@ -33,7 +33,7 @@ export default async function ReportsPage() {
         title="Laporan"
         description={
           isInvestor
-            ? "Ringkasan per Funding: kontribusi dan bagi hasil Anda pada setiap kolam dana."
+            ? "Ringkasan per Funding: kontribusi dan bagi hasil Anda pada setiap Funding."
             : "Ringkasan per Funding: dana terhimpun, proyek, laba, dan pengembalian pokok."
         }
       >
@@ -73,7 +73,7 @@ export default async function ReportsPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Ringkasan per Funding ({rows.length})</CardTitle>
+          <CardTitle>Ringkasan Funding ({rows.length})</CardTitle>
         </CardHeader>
         <CardContent className="p-0 sm:p-0">
           <DataTable
@@ -209,7 +209,7 @@ export default async function ReportsPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Rincian Proyek per Funding ({projects.length})</CardTitle>
+          <CardTitle>Rincian Proyek ({projects.length})</CardTitle>
         </CardHeader>
         <CardContent className="p-0 sm:p-0">
           <DataTable

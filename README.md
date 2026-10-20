@@ -1,4 +1,4 @@
-# AdjitPro — Aplikasi Pencatatan Keuangan Investasi (Next.js)
+# AdjitPro — Aplikasi Pencatatan Investasi (Next.js)
 
 **Teknologi:** Next.js 15 (App Router) · React 19 · TypeScript · PostgreSQL · Drizzle ORM · Tailwind CSS 3 · shadcn/ui · Vitest.
 

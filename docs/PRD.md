@@ -1,10 +1,10 @@
-# PRD — AdjitPro: Aplikasi Pencatatan Keuangan Investasi
+# PRD — AdjitPro: Aplikasi Pencatatan Investasi
 
 *Product Requirements Document*
 
 | | |
 | --- | --- |
-| **Produk** | AdjitPro — Aplikasi Pencatatan Keuangan Investasi |
+| **Produk** | AdjitPro — Aplikasi Pencatatan Investasi |
 | **Versi dokumen** | 1.5 |
 | **Tanggal** | 17 Oktober 2026 |
 | **Status** | Disetujui — v1.1 menambah **Ledger Proyek** (§7.15); v1.2 memindahkan buat/ubah/hapus **proyek** ke admin+client (§6.1, §7.7); v1.3 menambah kolom **deskripsi** & tampilan tabel ledger; v1.4 menetapkan **standar tabel** (§7.16); v1.5 menetapkan **standar format persen** maksimal 2 desimal ke atas, tanpa memaksa nol (§7.17) |

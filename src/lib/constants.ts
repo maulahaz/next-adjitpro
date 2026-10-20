@@ -5,7 +5,7 @@
  */
 
 export const APP_NAME =
-  process.env.APP_NAME ?? "AdjitPro — Aplikasi Pencatatan Keuangan Investasi";
+  process.env.APP_NAME ?? "AdjitPro — Aplikasi Pencatatan Investasi";
 
 /** Zona waktu (sama dengan spreadsheet lama). */
 export const TIME_ZONE = "Asia/Jakarta";

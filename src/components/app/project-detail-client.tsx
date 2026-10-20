@@ -103,11 +103,11 @@ export function ProjectDetailClient({
                 title="Bagi Hasil Proyek"
                 description={
                   locked
-                    ? "Laba dipecah sesuai persen pada aturan hasil (invest_agreements), lalu dibagi pro-rata ke kontributor Funding. Proyek tetap berstatus Ditutup."
-                    : "Laba dipecah sesuai persen pada aturan hasil (invest_agreements), lalu dibagi pro-rata ke kontributor Funding. Proyek akan berstatus Selesai."
+                    ? "Laba/Rugi dipecah sesuai persen pada aturan bagi hasil, lalu dibagi pro-rata ke kontributor Funding. Proyek tetap berstatus Ditutup."
+                    : "Laba/Rugi dipecah sesuai persen pada aturan bagi hasil, lalu dibagi pro-rata ke kontributor Funding. Proyek akan berstatus Selesai."
                 }
                 action={distributeProfitAction}
-                submitLabel="Bagikan Laba"
+                submitLabel="Bagikan"
               >
                 <input type="hidden" name="projectId" value={project.id} />
                 <div className="rounded-md border bg-muted/40 p-3 text-sm">
@@ -116,7 +116,7 @@ export function ProjectDetailClient({
                     <span className="font-medium">{formatRupiah(totals.modal)}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span>Laba dibagi</span>
+                    <span>Laba/Rugi</span>
                     <span className={`font-semibold ${totals.laba < 0 ? "text-destructive" : "text-success"}`}>
                       {formatRupiah(totals.laba)}
                     </span>

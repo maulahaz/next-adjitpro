@@ -94,7 +94,7 @@ postgres://<user>:<password>@<host>:<port>/<database>
 | Variabel | Wajib | Default | Keterangan |
 | --- | :-: | --- | --- |
 | `DATABASE_URL` | ✔ | — | Koneksi PostgreSQL (lokal atau Neon). |
-| `APP_NAME` | ✖ | *AdjitPro — Aplikasi Pencatatan Keuangan Investasi* | Judul aplikasi. |
+| `APP_NAME` | ✖ | *AdjitPro — Aplikasi Pencatatan Investasi* | Judul aplikasi. |
 | `SESSION_TTL_SECONDS` | ✖ | `21600` | Lama sesi (detik). |
 | `MAX_LOGIN_ATTEMPTS` | ✖ | `5` | Jumlah gagal login sebelum akun dikunci sementara. |
 | `LOCKOUT_SECONDS` | ✖ | `300` | Lama kunci sementara (detik). |
