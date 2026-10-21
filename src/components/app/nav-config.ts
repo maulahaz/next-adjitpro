@@ -7,6 +7,7 @@ import {
   FolderKanban,
   KeyRound,
   LayoutDashboard,
+  LifeBuoy,
   PieChart,
   ShieldCheck,
   Users,
@@ -35,6 +36,7 @@ export const NAV_ITEMS: NavItem[] = [
   { href: "/reports", label: "Laporan", roles: ["admin", "operator", "investor"], icon: FileBarChart },
   { href: "/third-parties", label: "Mitra", roles: ["admin", "operator"], icon: Building2 },
   { href: "/users", label: "Pengguna", roles: ["admin"], icon: ShieldCheck },
+  { href: "/bantuan", label: "Bantuan", roles: ["admin", "operator", "investor", "client"], icon: LifeBuoy },
   { href: "/password", label: "Ganti Password", roles: ["admin", "operator", "investor", "client"], icon: KeyRound },
 ];
 

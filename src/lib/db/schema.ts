@@ -303,6 +303,62 @@ export const profitDistributions = pgTable(
   }),
 );
 
+/* ======================= BANTUAN (HELP DESK) ====================== */
+/**
+ * Laporan bantuan — modul baru (tidak ada di aplikasi lama).
+ *
+ * Sarana komunikasi pengguna aplikasi ke Admin (Web-Dev) bila terjadi
+ * error/bug. Semua peran boleh membuat laporan, tetapi hanya Admin yang
+ * boleh mereview, memberi komentar, dan mengubah status.
+ */
+export const helpTickets = pgTable(
+  "help_tickets",
+  {
+    id: text("id").primaryKey(),
+    judul: text("judul").notNull().default(""),
+    tanggal: date("tanggal"),
+    /** Opsional; bila kosong dipakai nama akun pelapor. */
+    namaPelapor: text("nama_pelapor").notNull().default(""),
+    /** Pelapor — otomatis dari sesi login. */
+    userId: text("user_id").notNull(),
+    deskripsi: text("deskripsi").notNull().default(""),
+    /** 'Baru' | 'Diproses' | 'Ditutup' | 'Dibatalkan' */
+    status: text("status").notNull().default("Baru"),
+    /** Tanggapan Admin. */
+    komentar: text("komentar").notNull().default(""),
+    ditanggapiOleh: text("ditanggapi_oleh").notNull().default(""),
+    ditanggapiAt: timestamp("ditanggapi_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    userIdx: index("help_tickets_user_idx").on(t.userId),
+    statusIdx: index("help_tickets_status_idx").on(t.status),
+  }),
+);
+
+/**
+ * Lampiran laporan (maksimal satu per laporan). Disimpan terpisah dari
+ * `help_tickets` agar daftar laporan tidak ikut menarik isi berkas.
+ * Isi berkas disimpan sebagai base64 (Lampiran maks 1 MB).
+ */
+export const helpAttachments = pgTable(
+  "help_attachments",
+  {
+    id: serial("id").primaryKey(),
+    ticketId: text("ticket_id").notNull(),
+    /** Nama berkas asli. */
+    nama: text("nama").notNull().default(""),
+    /** 'image/jpeg' | 'image/png' (hasil deteksi magic bytes). */
+    mime: text("mime").notNull().default(""),
+    /** Ukuran berkas dalam byte. */
+    ukuran: integer("ukuran").notNull().default(0),
+    data: text("data").notNull().default(""),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({ ticketUq: uniqueIndex("help_attach_ticket_uq").on(t.ticketId) }),
+);
+
 /* ============================ AUDIT LOG ============================ */
 
 export const auditLog = pgTable(
@@ -365,6 +421,8 @@ export type FundingReturnRow = typeof fundingReturns.$inferSelect;
 export type ProjectTransactionRow = typeof projectTransactions.$inferSelect;
 export type ProjectLedgerRow = typeof projectLedgers.$inferSelect;
 export type ProfitDistributionRow = typeof profitDistributions.$inferSelect;
+export type HelpTicketRow = typeof helpTickets.$inferSelect;
+export type HelpAttachmentRow = typeof helpAttachments.$inferSelect;
 export type AuditLogRow = typeof auditLog.$inferSelect;
 export type SessionRow = typeof sessions.$inferSelect;
 export type LoginAttemptRow = typeof loginAttempts.$inferSelect;

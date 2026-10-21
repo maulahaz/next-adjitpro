@@ -33,8 +33,9 @@ export function MyProjectsClient({
 }) {
   const [filter, setFilter] = React.useState<"aktif" | "arsip">("aktif");
 
-  const archived = projects.filter((p) => p.status === "Ditutup");
-  const active = projects.filter((p) => p.status !== "Ditutup");
+  // Urutkan proyek berdasarkan ID (terbaru dulu) — format ID legacy (PRJ-XXXX) sorting string sudah benar
+  const archived = projects.filter((p) => p.status === "Ditutup").sort((a, b) => b.id.localeCompare(a.id));
+  const active = projects.filter((p) => p.status !== "Ditutup").sort((a, b) => b.id.localeCompare(a.id));
   const visible = filter === "arsip" ? archived : active;
 
   // Opsi untuk create: hanya Funding siap pakai milik client (komplit + aturan bagi hasil).

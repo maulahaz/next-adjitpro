@@ -50,6 +50,12 @@ export const STATUS = {
   CONTRIB_AKTIF: "Aktif",
   CONTRIB_DIKEMBALIKAN: "Dikembalikan",
   CONTRIB_DIBATALKAN: "Dibatalkan",
+
+  /** Siklus hidup laporan Bantuan (modul baru). */
+  BANTUAN_BARU: "Baru",
+  BANTUAN_DIPROSES: "Diproses",
+  BANTUAN_DITUTUP: "Ditutup",
+  BANTUAN_DIBATALKAN: "Dibatalkan",
 } as const;
 
 /** Aturan pembagian rugi pada `invest_agreements`. */
@@ -103,6 +109,7 @@ export const ID_PREFIX = {
   FundingContributions: "FNC",
   FundingReturns: "FR",
   InvestAgreements: "IA",
+  HelpTickets: "BTN",
 } as const;
 
 export type EntityName = keyof typeof ID_PREFIX;
@@ -136,6 +143,15 @@ export const FUNDING_STATUSES = ["Draft", "Komplit", "Release", "Berjalan", "Lun
 export const CONTRIB_STATUSES = ["Aktif", "Dikembalikan", "Dibatalkan"] as const;
 export const LOSS_RULES = [LOSS_RULE.PROPORSIONAL, LOSS_RULE.INVESTOR, LOSS_RULE.CLIENT] as const;
 export const ROLE_VALUES = ["admin", "operator", "investor", "client"] as const;
+/** Status laporan Bantuan (modul baru). */
+export const HELP_STATUSES = [
+  STATUS.BANTUAN_BARU,
+  STATUS.BANTUAN_DIPROSES,
+  STATUS.BANTUAN_DITUTUP,
+  STATUS.BANTUAN_DIBATALKAN,
+] as const;
+/** Status laporan Bantuan yang sudah final (tidak bisa diubah lagi). */
+export const HELP_STATUS_AKHIR = [STATUS.BANTUAN_DITUTUP, STATUS.BANTUAN_DIBATALKAN] as const;
 
 function numEnv(key: string, fallback: number): number {
   const raw = process.env[key];

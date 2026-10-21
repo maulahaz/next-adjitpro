@@ -110,6 +110,7 @@ export function ConfirmDialog({
   action,
   hidden,
   confirmLabel = "Hapus",
+  onSuccess,
 }: {
   trigger: React.ReactNode;
   title: string;
@@ -117,6 +118,7 @@ export function ConfirmDialog({
   action: FormAction;
   hidden: Record<string, string>;
   confirmLabel?: string;
+  onSuccess?: () => void;
 }) {
   return (
     <FormDialog
@@ -127,6 +129,7 @@ export function ConfirmDialog({
       submitLabel={confirmLabel}
       submitVariant="destructive"
       pendingLabel="Memproses..."
+      onSuccess={onSuccess}
     >
       {Object.entries(hidden).map(([k, v]) => (
         <input key={k} type="hidden" name={k} value={v} />

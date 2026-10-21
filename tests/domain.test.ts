@@ -14,6 +14,17 @@ import { canWrite, hasRole, isAdmin, isClient, rolesReadInternal, rolesWrite } f
 import { computeLedgerTotals } from "@/lib/domain/ledger-totals";
 import { splitProjectProfit } from "@/lib/domain/funding-split";
 import { legacyHashPassword, verifyPassword } from "@/lib/auth/password";
+import {
+  HELP_ATTACHMENT_MAX_BYTES,
+  HELP_TITLE_MAX,
+  canUpdateHelp,
+  detectImageMime,
+  formatBytes,
+  isFinalHelp,
+  validateHelpAttachment,
+  validateHelpDescription,
+  validateHelpTitle,
+} from "@/lib/domain/help";
 
 describe("allocateProRata", () => {
   it("contoh kasus klien: A=225jt, B=150jt, C=225jt, laba 95jt", () => {
@@ -384,5 +395,72 @@ describe("kompatibilitas hash password lama (SHA-256 + salt)", () => {
       // dihitung langsung dengan node crypto untuk memastikan ekuivalen
       createHash("sha256").update("sss::pw", "utf8").digest("hex"),
     );
+  });
+});
+
+describe("modul bantuan", () => {
+  it("judul wajib dan maksimal 50 karakter", () => {
+    expect(validateHelpTitle("")).toBe("Judul wajib diisi.");
+    expect(validateHelpTitle("   ")).toBe("Judul wajib diisi.");
+    expect(validateHelpTitle("a".repeat(HELP_TITLE_MAX))).toBeNull();
+    expect(validateHelpTitle("a".repeat(HELP_TITLE_MAX + 1))).toBe(
+      "Judul maksimal 50 karakter.",
+    );
+  });
+
+  it("deskripsi wajib diisi", () => {
+    expect(validateHelpDescription("")).toBe("Deskripsi wajib diisi.");
+    expect(validateHelpDescription("   ")).toBe("Deskripsi wajib diisi.");
+    expect(validateHelpDescription("Error saat menyimpan proyek")).toBeNull();
+  });
+
+  it("validasi lampiran: tipe & ukuran", () => {
+    expect(validateHelpAttachment({ mime: "image/jpeg", ukuran: 1024 })).toBeNull();
+    expect(
+      validateHelpAttachment({ mime: "image/png", ukuran: HELP_ATTACHMENT_MAX_BYTES }),
+    ).toBeNull();
+    expect(
+      validateHelpAttachment({ mime: "image/png", ukuran: HELP_ATTACHMENT_MAX_BYTES + 1 }),
+    ).toBe("Ukuran lampiran maksimal 1 MB.");
+    expect(validateHelpAttachment({ mime: "application/pdf", ukuran: 1024 })).toBe(
+      "Lampiran harus berupa gambar JPG atau PNG.",
+    );
+    expect(validateHelpAttachment({ mime: "image/png", ukuran: 0 })).toBe(
+      "Berkas lampiran kosong.",
+    );
+  });
+
+  it("regresi: objek lampiran memakai properti `ukuran` (bukan `size`)", () => {
+    // Bentuk objek yang dikirim Server Action -> service: harus lolos validasi.
+    const input = { nama: "bukti.png", mime: "image/png", ukuran: 2048, data: "AAAA" };
+    expect(validateHelpAttachment(input)).toBeNull();
+  });
+
+  it("deteksi tipe gambar dari magic bytes, bukan file.type", () => {
+    expect(detectImageMime(new Uint8Array([0xff, 0xd8, 0xff, 0xe0]))).toBe("image/jpeg");
+    expect(
+      detectImageMime(new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00])),
+    ).toBe("image/png");
+    expect(detectImageMime(new Uint8Array([0x47, 0x49, 0x46, 0x38]))).toBeNull();
+    expect(detectImageMime(new Uint8Array([]))).toBeNull();
+  });
+
+  it("hanya Baru/Diproses yang bisa diubah; Ditutup/Dibatalkan final", () => {
+    expect(canUpdateHelp("Baru")).toBe(true);
+    expect(canUpdateHelp("Diproses")).toBe(true);
+    expect(canUpdateHelp("Ditutup")).toBe(false);
+    expect(canUpdateHelp("Dibatalkan")).toBe(false);
+
+    expect(isFinalHelp("Ditutup")).toBe(true);
+    expect(isFinalHelp("Dibatalkan")).toBe(true);
+    expect(isFinalHelp("Diproses")).toBe(false);
+    expect(isFinalHelp("Baru")).toBe(false);
+  });
+
+  it("format ukuran berkas", () => {
+    expect(formatBytes(0)).toBe("0 KB");
+    expect(formatBytes(900)).toBe("900 B");
+    expect(formatBytes(1024)).toBe("1.0 KB");
+    expect(formatBytes(HELP_ATTACHMENT_MAX_BYTES)).toBe("1.0 MB");
   });
 });

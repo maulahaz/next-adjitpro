@@ -36,6 +36,13 @@
       "when": 1792430793898,
       "tag": "0004_empty_triton",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1792568522768,
+      "tag": "0005_cute_namorita",
+      "breakpoints": true
     }
   ]
 }
