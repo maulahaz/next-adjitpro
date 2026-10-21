@@ -3,7 +3,7 @@
  * Port dari `Reports.gs`, disesuaikan dengan model Funding.
  */
 
-import { asc, eq } from "drizzle-orm";
+import { asc, desc, eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import {
   fundingContributions,
@@ -147,7 +147,7 @@ export async function listProjectsForClient(thirdPartyId: string): Promise<Clien
   if (!thirdPartyId) return [];
 
   const [rows, tps, funds, contribs] = await Promise.all([
-    db.select().from(projects).where(eq(projects.pihakKetigaId, thirdPartyId)).orderBy(asc(projects.id)),
+    db.select().from(projects).where(eq(projects.pihakKetigaId, thirdPartyId)).orderBy(desc(projects.id)),
     db.select().from(thirdParties),
     db.select().from(fundings),
     db.select().from(fundingContributions),

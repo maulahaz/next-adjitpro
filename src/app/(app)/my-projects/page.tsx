@@ -23,7 +23,7 @@ export default async function MyProjectsPage() {
     <div>
       <PageHeader
         title="Proyek Saya"
-        description="Kelola proyek, tutup proyek yang selesai, dan catat entri Ledger."
+        description="Kelola proyek dan entri Ledger."
       />
       <MyProjectsClient projects={projects} fundings={fundings} />
     </div>

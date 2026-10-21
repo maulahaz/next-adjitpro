@@ -1,5 +1,6 @@
 "use client";
 
+import * as React from "react";
 import Link from "next/link";
 import { BookOpen, CheckCircle2, Pencil, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -30,7 +31,13 @@ export function MyProjectsClient({
   projects: ClientProjectDTO[];
   fundings: FundingDTO[];
 }) {
-  // Opsi untuk proyek BARU: hanya Funding siap pakai (Komplit + aturan bagi hasil).
+  const [filter, setFilter] = React.useState<"aktif" | "arsip">("aktif");
+
+  const archived = projects.filter((p) => p.status === "Ditutup");
+  const active = projects.filter((p) => p.status !== "Ditutup");
+  const visible = filter === "arsip" ? archived : active;
+
+  // Opsi untuk create: hanya Funding siap pakai milik client (komplit + aturan bagi hasil).
   const createOptions = fundings.map((f) => ({
     value: f.id,
     label: `${f.nama} (Total: ${formatRupiah(f.targetModal)})`,
@@ -50,8 +57,14 @@ export function MyProjectsClient({
     return createOptions;
   }
 
+  const searchRows = visible.map(
+    (p) =>
+      `${p.nama} ${p.id} ${p.fundingNama ?? ""} ${p.status} ${p.catatan ?? ""}`,
+  );
+
   return (
     <DataTable
+      key={filter}
       toolbar={
         <FormDialog
           trigger={
@@ -66,8 +79,22 @@ export function MyProjectsClient({
           <ClientProjectFields fundingOptions={createOptions} />
         </FormDialog>
       }
+      filters={
+        <div className="w-full sm:w-56">
+          <SelectInput
+            aria-label="Filter proyek"
+            value={filter}
+            onChange={(e) => setFilter(e.target.value as "aktif" | "arsip")}
+            options={[
+              { value: "aktif", label: `Proyek Aktif (${active.length})` },
+              { value: "arsip", label: `Arsip (${archived.length})` },
+            ]}
+          />
+        </div>
+      }
       searchPlaceholder="Cari proyek…"
-      emptyMessage="Belum ada proyek yang terkait dengan akun Anda."
+      emptyMessage={filter === "aktif" ? "Belum ada proyek yang terkait dengan akun Anda." : "Belum ada proyek di arsip."}
+      noMatchMessage={filter === "aktif" ? "Tidak ada proyek aktif yang cocok dengan pencarian." : "Tidak ada proyek di arsip yang cocok dengan pencarian."}
       head={
         <TableRow>
           <TableHead>ID</TableHead>
@@ -79,11 +106,8 @@ export function MyProjectsClient({
           <TableHead className="text-right">Aksi</TableHead>
         </TableRow>
       }
-      searchText={projects.map(
-        (p) =>
-          `${p.nama} ${p.id} ${p.fundingNama ?? ""} ${p.status} ${p.catatan ?? ""}`,
-      )}
-      rows={projects.map((p) => (
+      searchText={searchRows}
+      rows={visible.map((p) => (
         <TableRow key={p.id}>
           <TableCell className="font-mono text-xs">{p.id}</TableCell>
           <TableCell className="font-medium">{p.nama}</TableCell>
@@ -113,47 +137,50 @@ export function MyProjectsClient({
                   <BookOpen className="h-4 w-4" /> Ledger
                 </Link>
               </Button>
-              {p.status !== "Ditutup" ? (
-                <FormDialog
-                  trigger={
-                    <Button variant="outline" size="sm" title="Tutup proyek">
-                      <CheckCircle2 className="h-4 w-4" /> Tutup
-                    </Button>
-                  }
-                  title="Tutup Proyek"
-                  description="Apakah Anda yakin menutup proyek ini? Proyek yang ditutup tidak bisa diubah lagi, dan akan memicu email ke investor."
-                  action={closeProjectAction}
-                  submitLabel="Tutup Proyek"
-                >
-                  <input type="hidden" name="projectId" value={p.id} />
-                </FormDialog>
-              ) : null}
-              {p.status !== "Ditutup" ? (
+              {filter === "aktif" ? (
                 <>
-                  <FormDialog
-                    trigger={
-                      <Button variant="ghost" size="icon" aria-label="Ubah">
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                    }
-                    title="Ubah Proyek"
-                    action={saveProjectAction}
-                  >
-                    <ClientProjectFields project={p} fundingOptions={optionsForProject(p)} />
-                  </FormDialog>
-                  <ConfirmDialog
-                    trigger={
-                      <Button variant="ghost" size="icon" aria-label="Hapus" className="text-destructive">
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    }
-                    title="Hapus Proyek"
-                    description={`Hapus proyek ${p.nama}? Hanya proyek Draft tanpa riwayat keuangan yang bisa dihapus.`}
-                    action={deleteProjectAction}
-                    hidden={{ id: p.id }}
-                  />
+                  {p.status !== "Ditutup" ? (
+                    <FormDialog
+                      trigger={
+                        <Button variant="outline" size="sm" title="Tutup proyek">
+                          <CheckCircle2 className="h-4 w-4" /> Tutup
+                        </Button>
+                      }
+                      title="Tutup Proyek"
+                      description="Apakah Anda yakin menutup proyek ini? Proyek yang ditutup tidak bisa diubah lagi, dan akan memicu email ke investor."
+                      action={closeProjectAction}
+                      submitLabel="Tutup Proyek"
+                    >
+                      <input type="hidden" name="projectId" value={p.id} />
+                    </FormDialog>
+                  ) : null}
+                  <>
+                    <FormDialog
+                      trigger={
+                        <Button variant="ghost" size="icon" aria-label="Ubah">
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                      }
+                      title="Ubah Proyek"
+                      action={saveProjectAction}
+                    >
+                      <ClientProjectFields project={p} fundingOptions={optionsForProject(p)} />
+                    </FormDialog>
+                    <ConfirmDialog
+                      trigger={
+                        <Button variant="ghost" size="icon" aria-label="Hapus" className="text-destructive">
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      }
+                      title="Hapus Proyek"
+                      description={`Hapus proyek ${p.nama}? Hanya proyek Draft tanpa riwayat keuangan yang bisa dihapus.`}
+                      action={deleteProjectAction}
+                      hidden={{ id: p.id }}
+                    />
+                  </>
                 </>
-              ) : (
+              ) : null}
+              {filter === "arsip" ? (
                 <span className="self-center text-xs text-muted-foreground">
                   <Button variant="ghost" size="icon" aria-label="Ubah" disabled>
                     <Pencil className="h-4 w-4" />
@@ -162,7 +189,7 @@ export function MyProjectsClient({
                     <Trash2 className="h-4 w-4" />
                   </Button>
                 </span>
-              )}
+              ) : null}
             </div>
           </TableCell>
         </TableRow>
