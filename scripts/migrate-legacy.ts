@@ -332,7 +332,7 @@ async function main() {
       targetModal: toInt(r.TargetModal),
       tanggalMulai: toDate(r.TanggalMulai) ?? toDate(r.Tanggal),
       jatuhTempo: toDate(r.JatuhTempo),
-      status: s(r.Status) || "Berjalan",
+      status: s(r.Status) || "Draft", //"Berjalan",
       catatan: s(r.Catatan),
     });
     fundingByThirdParty.set(tpId, id);
@@ -359,7 +359,7 @@ async function main() {
       targetModal: 0,
       tanggalMulai: toDate(new Date().toISOString().slice(0, 10)),
       jatuhTempo: null,
-      status: "Berjalan",
+      status: "Draft", //"Berjalan",
       catatan: "Funding migrasi otomatis",
     });
   }

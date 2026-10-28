@@ -200,7 +200,9 @@ export async function listUsableFundingOptions(
   if (!all.length) return [];
   const agrs = await tx.select().from(investAgreements);
   const withAgreement = new Set(agrs.map((a) => a.fundingId));
-  return all.filter((f) => f.status === STATUS.FUND_RELEASE && withAgreement.has(f.id));
+  // return all.filter((f) => f.status === STATUS.FUND_RELEASE && withAgreement.has(f.id));
+  // Hanya tampilkan Funding yang statusnya `Release` atau `Berjalan` (bisa dipakai client) DAN sudah ada aturan bagi hasil.
+  return all.filter((f) => (f.status === STATUS.FUND_RELEASE || f.status === STATUS.FUND_BERJALAN) && withAgreement.has(f.id));
 }
 
 export async function getFundingDetail(id: string, tx: DbOrTx = db): Promise<FundingDetailDTO> {
@@ -682,7 +684,7 @@ async function assertReleasable(fundingId: string, status: string): Promise<void
 
 /**
  * Sinkronkan status Draft/Komplit sebuah Funding dengan total kontribusi:
- * `Komplit` bila total ≥ target (target > 0). Status `Berjalan`/`Lunas`/
+ * `Komplit` bila total ≥ target (target > 0).
  * `Dibatalkan` tidak diubah otomatis.
  */
 async function recomputeFundingStatus(fundingId: string): Promise<void> {

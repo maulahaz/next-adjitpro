@@ -254,13 +254,13 @@ export async function saveProject(
     if (funding.pihakKetigaId !== scopeTp) {
       throw new AppError("Anda tidak memiliki hak akses untuk funding ini.");
     }
-    // Client hanya boleh memakai Funding yang sudah **Release** (dan beraturan
+    // Client hanya boleh memakai Funding yang sudah **Release** OR **Berjalan** (dan beraturan
     // hasil) saat **memilih** Funding. Bila proyek sudah memakai Funding yang
     // sama (yang kini mungkin sudah Berjalan), gating tidak diulang.
     const keepsSameFunding = Boolean(existing && existing.fundingId === fundingId);
     if (!keepsSameFunding) {
-      if (funding.status !== STATUS.FUND_RELEASE) {
-        throw new AppError("Funding belum siap dipakai: status Funding harus Release.");
+      if (funding.status !== STATUS.FUND_RELEASE && funding.status !== STATUS.FUND_BERJALAN) {
+        throw new AppError("Funding belum siap dipakai: status Funding harus Release atau Berjalan.");
       }
       const agr = await db
         .select({ id: investAgreements.id })

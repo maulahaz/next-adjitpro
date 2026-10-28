@@ -165,7 +165,7 @@ export const fundings = pgTable(
     targetModal: bigint("target_modal", { mode: "number" }).notNull().default(0),
     tanggalMulai: date("tanggal_mulai"),
     jatuhTempo: date("jatuh_tempo"),
-    /** 'Draft' | 'Berjalan' | 'Lunas' | 'Dibatalkan' */
+    /** 'Draft' | 'Release'| 'Komplit' | 'Berjalan' | 'Lunas' | 'Dibatalkan' */
     status: text("status").notNull().default("Draft"),
     catatan: text("catatan").notNull().default(""),
     /**
