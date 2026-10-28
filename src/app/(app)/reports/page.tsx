@@ -1,4 +1,4 @@
-import { Download } from "lucide-react";
+import { Download, FileText } from "lucide-react";
 import { requireRolesPage } from "@/lib/auth/guard";
 import { getReportsScoped } from "@/lib/services/reports";
 import { formatRupiah } from "@/lib/domain/money";
@@ -92,6 +92,7 @@ export default async function ReportsPage() {
                   <TableHead className="text-right">Kontribusi Saya</TableHead>
                   <TableHead className="text-right">Laba Saya</TableHead>
                   <TableHead>Jatuh Tempo</TableHead>
+                  <TableHead>Lampiran</TableHead>
                 </TableRow>
               ) : (
                 <TableRow>
@@ -110,6 +111,7 @@ export default async function ReportsPage() {
                   <TableHead className="text-right">Dibagikan</TableHead>
                   <TableHead className="text-right">Pokok Kembali</TableHead>
                   <TableHead>Jatuh Tempo</TableHead>
+                  <TableHead>Lampiran</TableHead>
                 </TableRow>
               )
             }
@@ -162,6 +164,21 @@ export default async function ReportsPage() {
                     <TableCell className="text-muted-foreground">{displayDate(f.jatuhTempo)}</TableCell>
                   </>
                 )}
+                <TableCell>
+                  {f.lampiran ? (
+                    <a
+                      href={`/api/fundings/${f.id}/lampiran`}
+                      target="_blank"
+                      rel="noreferrer"
+                      aria-label="Lampiran"
+                      className="inline-flex text-muted-foreground hover:text-foreground"
+                    >
+                      <FileText className="h-4 w-4" />
+                    </a>
+                  ) : (
+                    <span className="text-muted-foreground">-</span>
+                  )}
+                </TableCell>
               </TableRow>
             ))}
             footer={
@@ -175,6 +192,7 @@ export default async function ReportsPage() {
                       {formatRupiah(totalKontribusiSaya)}
                     </TableCell>
                     <TableCell className="text-right tabular-nums">{formatRupiah(totalLabaSaya)}</TableCell>
+                    <TableCell />
                     <TableCell />
                   </TableRow>
                 ) : (
@@ -198,6 +216,7 @@ export default async function ReportsPage() {
                     <TableCell className="text-right tabular-nums">{formatRupiah(totalLaba)}</TableCell>
                     <TableCell className="text-right tabular-nums">{formatRupiah(totalDibagikan)}</TableCell>
                     <TableCell className="text-right tabular-nums">{formatRupiah(totalReturn)}</TableCell>
+                    <TableCell />
                     <TableCell />
                   </TableRow>
                 )

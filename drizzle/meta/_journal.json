@@ -43,6 +43,13 @@
       "when": 1792568522768,
       "tag": "0005_cute_namorita",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1793195828940,
+      "tag": "0006_flaky_photon",
+      "breakpoints": true
     }
   ]
 }

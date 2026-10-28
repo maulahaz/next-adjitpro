@@ -1,3 +1,4 @@
+import { FileText } from "lucide-react";
 import { formatRupiah, formatPorsi } from "@/lib/domain/money";
 import { displayDate } from "@/lib/domain/dates";
 import { PrintButton } from "@/components/app/print-button";
@@ -142,6 +143,7 @@ export function StatementCard({
                 <TableHead>TotalProyek</TableHead>
                 <TableHead>Jatuh Tempo</TableHead>
                 <TableHead>Status</TableHead>
+                <TableHead>Lampiran</TableHead>
               </TableRow>
             }
             searchText={fundingSummary.map((f) => `${f.nama} ${f.pihakKetigaNama} ${f.status}`)}
@@ -159,6 +161,21 @@ export function StatementCard({
                 <TableCell className="text-muted-foreground">{displayDate(f.jatuhTempo)}</TableCell>
                 <TableCell>
                   <StatusPill status={f.status} />
+                </TableCell>
+                <TableCell>
+                  {f.lampiran ? (
+                    <a
+                      href={`/api/fundings/${f.id}/lampiran`}
+                      target="_blank"
+                      rel="noreferrer"
+                      aria-label="Lampiran"
+                      className="inline-flex text-muted-foreground hover:text-foreground"
+                    >
+                      <FileText className="h-4 w-4" />
+                    </a>
+                  ) : (
+                    <span className="text-muted-foreground">-</span>
+                  )}
                 </TableCell>
               </TableRow>
             ))}

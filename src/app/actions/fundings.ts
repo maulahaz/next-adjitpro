@@ -1,5 +1,6 @@
 "use server";
 
+import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { requireWrite } from "@/lib/auth/guard";
 import {
@@ -14,6 +15,17 @@ import {
 } from "@/lib/services/fundings";
 import { dec, errorState, num, ok, str } from "@/lib/actions-util";
 import type { ActionState } from "@/lib/action-types";
+import { AppError } from "@/lib/errors";
+import {
+  FUNDING_ATTACHMENT_MAX_BYTES,
+  attachmentContentDisposition,
+  attachmentMime,
+  buildObjectKey,
+  detectDocumentKind,
+  safeBaseName,
+  validateFundingAttachment,
+} from "@/lib/domain/funding-attachment";
+import { deleteObject, uploadObject } from "@/lib/storage/s3";
 
 function revalidate(fundingId?: string) {
   revalidatePath("/fundings");
@@ -22,14 +34,54 @@ function revalidate(fundingId?: string) {
   revalidatePath("/my-projects");
   revalidatePath("/dashboard");
   revalidatePath("/reports");
+  revalidatePath("/my-card");
   revalidatePath("/investors");
   if (fundingId) revalidatePath(`/fundings/${fundingId}`);
 }
 
-/** Simpan Funding (kolam dana). Admin/operator. */
+/**
+ * Simpan Funding (kolam dana). Admin/operator.
+ *
+ * Lampiran (opsional) diunggah ke Neon Object Storage sebelum data disimpan.
+ * Bila penyimpanan DB gagal, objek yang sudah terunggah dibersihkan kembali.
+ */
 export async function saveFundingAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  const uploaded: string[] = [];
   try {
     const session = await requireWrite();
+
+    // Tri-state: undefined = jangan ubah, null = hapus, string = lampiran baru.
+    let lampiran: string | null | undefined;
+
+    const file = formData.get("lampiran");
+    if (file instanceof File && file.size > 0) {
+      if (file.size > FUNDING_ATTACHMENT_MAX_BYTES) {
+        throw new AppError("Ukuran lampiran maksimal 2 MB.");
+      }
+
+      const bytes = new Uint8Array(await file.arrayBuffer());
+      const kind = detectDocumentKind(bytes);
+      const metaError = validateFundingAttachment({
+        nama: file.name,
+        ukuran: bytes.byteLength,
+        kind,
+      });
+      if (metaError || !kind) throw new AppError(metaError ?? "Lampiran tidak valid.");
+
+      const key = buildObjectKey(randomUUID(), file.name, kind);
+      const nama = `${safeBaseName(file.name)}.${kind}`;
+      await uploadObject(
+        key,
+        bytes,
+        attachmentMime(kind),
+        attachmentContentDisposition(kind, nama),
+      );
+      uploaded.push(key);
+      lampiran = key;
+    } else if (str(formData, "hapusLampiran") === "on") {
+      lampiran = null;
+    }
+
     const saved = await saveFunding(
       {
         id: str(formData, "id") || undefined,
@@ -40,12 +92,21 @@ export async function saveFundingAction(_prev: ActionState, formData: FormData):
         jatuhTempo: str(formData, "jatuhTempo"),
         status: str(formData, "status") || undefined,
         catatan: str(formData, "catatan"),
+        lampiran,
       },
       session.username,
     );
     revalidate(saved.id);
     return ok("Funding disimpan.");
   } catch (err) {
+    // Hindari objek yatim bila data gagal disimpan.
+    for (const key of uploaded) {
+      try {
+        await deleteObject(key);
+      } catch {
+        // abaikan — objek bisa dibersihkan manual dari dashboard Neon
+      }
+    }
     return errorState(err);
   }
 }

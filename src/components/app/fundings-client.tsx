@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Eye, Pencil, Plus, Trash2 } from "lucide-react";
+import { Eye, FileText, Pencil, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -13,6 +13,7 @@ import { TableCell, TableHead, TableRow } from "@/components/ui/table";
 import { saveFundingAction, deleteFundingAction } from "@/app/actions/fundings";
 import { formatRupiah } from "@/lib/domain/money";
 import { displayDate, todayStr } from "@/lib/domain/dates";
+import { fileNameFromKey } from "@/lib/domain/funding-attachment";
 import type { FundingDTO } from "@/lib/services/fundings";
 import type { ThirdPartyDTO } from "@/lib/services/third-parties";
 
@@ -87,6 +88,13 @@ export function FundingsClient({
           </TableCell>
           <TableCell>
             <div className="flex justify-end gap-1">
+              {f.lampiran ? (
+                <Button asChild variant="ghost" size="icon" aria-label="Lampiran">
+                  <a href={`/api/fundings/${f.id}/lampiran`} target="_blank" rel="noreferrer">
+                    <FileText className="h-4 w-4" />
+                  </a>
+                </Button>
+              ) : null}
               <Button asChild variant="ghost" size="icon" aria-label="Detail">
                 <Link href={`/fundings/${f.id}`}>
                   <Eye className="h-4 w-4" />
@@ -183,6 +191,37 @@ function FundingFields({
       <Field label="Catatan" htmlFor="fn-catatan">
         <Textarea id="fn-catatan" name="catatan" defaultValue={funding?.catatan ?? ""} />
       </Field>
+      <Field
+        label="Lampiran"
+        htmlFor="fn-lampiran"
+        hint="Opsional — PDF/DOC/DOCX, maksimal 2 MB."
+      >
+        <Input
+          id="fn-lampiran"
+          name="lampiran"
+          type="file"
+          accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        />
+      </Field>
+      {funding?.lampiran ? (
+        <div className="space-y-2 rounded-md border p-3 text-sm">
+          <div className="flex items-center gap-2">
+            <FileText className="h-4 w-4 text-muted-foreground" />
+            <a
+              href={`/api/fundings/${funding.id}/lampiran`}
+              target="_blank"
+              rel="noreferrer"
+              className="font-medium hover:underline"
+            >
+              {fileNameFromKey(funding.lampiran)}
+            </a>
+          </div>
+          <label className="flex items-center gap-2 text-muted-foreground">
+            <input type="checkbox" name="hapusLampiran" className="h-4 w-4 rounded border-input" />
+            Hapus lampiran saat menyimpan
+          </label>
+        </div>
+      ) : null}
     </>
   );
 }

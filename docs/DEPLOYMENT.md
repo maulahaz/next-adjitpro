@@ -32,6 +32,7 @@ Salin seluruh proyek ke penyedia hosting, lalu set variabel lingkungan berikut
 | `APP_NAME` | (opsional) nama aplikasi yang tampil di UI. |
 | `SESSION_TTL_SECONDS` | (opsional) default `21600`. |
 | `MAX_LOGIN_ATTEMPTS` / `LOCKOUT_SECONDS` | (opsional) default `5` / `300`. |
+| `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_ENDPOINT_URL_S3`, `AWS_REGION`, `S3_BUCKET` | Lampiran Funding (Neon Object Storage, bucket privat). Lihat `docs/INSTALL.md` §4.1. |
 
 Untuk **Vercel**: Project ▸ Settings ▸ Environment Variables, tambahkan untuk
 *Production* (dan *Preview* bila perlu).

@@ -280,6 +280,8 @@ export interface FundingReportRowDTO {
   lossRule: string;
   kontribusiSaya: number;
   labaSaya: number;
+  /** Object key lampiran (kosong bila tidak ada). */
+  lampiran: string;
 }
 
 /** Rincian proyek di bawah Funding (tabel kedua halaman Laporan). */
@@ -407,6 +409,7 @@ async function buildFundingReport(session: SessionUser | null): Promise<FundingR
       lossRule: agr?.lossRule ?? LOSS_RULE.PROPORSIONAL,
       kontribusiSaya: isInvestor ? myContrib : 0,
       labaSaya: isInvestor ? labaSaya : 0,
+      lampiran: f.lampiran ?? "",
     });
   }
 

@@ -99,6 +99,31 @@ postgres://<user>:<password>@<host>:<port>/<database>
 | `MAX_LOGIN_ATTEMPTS` | ✖ | `5` | Jumlah gagal login sebelum akun dikunci sementara. |
 | `LOCKOUT_SECONDS` | ✖ | `300` | Lama kunci sementara (detik). |
 | `BCRYPT_ROUNDS` | ✖ | `10` | Putaran bcrypt untuk password baru. |
+| `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_ENDPOINT_URL_S3`, `AWS_REGION`, `S3_BUCKET` | ✖ | — | Lampiran Funding di Neon Object Storage. Tanpa ini tombol upload lampiran gagal dengan pesan konfigurasi. |
+
+### 4.1 Lampiran Funding (Neon Object Storage)
+
+Lampiran Funding (PDF/DOC/DOCX, maksimal 2 MB) disimpan di bucket **privat**
+Neon Object Storage (kompatibel S3). Siapkan sekali per branch:
+
+```powershell
+neon buckets create adjitpro-lampiran
+neon credentials create --scope storage:read --scope storage:write --name adjitpro-uploads
+```
+
+Salin hasilnya ke `.env.local`:
+
+```dotenv
+AWS_ACCESS_KEY_ID="nak_live_..."        # token_id
+AWS_SECRET_ACCESS_KEY="nsk_live_..."    # s3_secret_access_key
+AWS_ENDPOINT_URL_S3="https://br-xxxx.storage.c-2.us-east-2.aws.neon.tech"
+AWS_REGION="us-east-2"
+S3_BUCKET="adjitpro-lampiran"
+```
+
+Endpoint & region bisa dilihat lewat `GET /api/v2/projects/{project_id}/branches/{branch_id}/storage`
+atau `neon env pull`. **Neon API Key bukan kredensial S3** — API key hanya
+untuk provisioning bucket/kredensial.
 
 File `.env.local` **tidak** ikut ter-commit (sudah ada di `.gitignore`).
 

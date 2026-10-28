@@ -26,6 +26,7 @@ import { LOSS_RULE, STATUS } from "@/lib/constants";
 import { todayStr, toDateString, addMonths } from "@/lib/domain/dates";
 import { parseMoneyInput, toNum } from "@/lib/domain/money";
 import { AppError } from "@/lib/errors";
+import { deleteObject, isStorageConfigured } from "@/lib/storage/s3";
 import { logAudit } from "./audit";
 import { nextId } from "./ids";
 import { loadBalances } from "./ledger";
@@ -42,6 +43,8 @@ export interface FundingDTO {
   jatuhTempo: string;
   status: string;
   catatan: string;
+  /** Object key lampiran pada Neon Object Storage (kosong bila tidak ada). */
+  lampiran: string;
   totalKontribusi: number;
   totalReturn: number;
   jumlahInvestor: number;
@@ -104,6 +107,8 @@ export interface FundingSummaryDTO {
   labaSaya: number;
   jumlahProyek: number;
   proyekList: { id: string; nama: string; status: string }[];
+  /** Object key lampiran (kosong bila tidak ada). */
+  lampiran: string;
 }
 
 /* ============================ PEMBANTU ============================ */
@@ -118,6 +123,7 @@ function mapFunding(
     jatuhTempo: string | null;
     status: string;
     catatan: string;
+    lampiran: string | null;
   },
   tpName: string,
   agg: { totalKontribusi: number; totalReturn: number; jumlahInvestor: number; jumlahProyek: number },
@@ -132,6 +138,7 @@ function mapFunding(
     jatuhTempo: toDateString(f.jatuhTempo),
     status: f.status || STATUS.FUND_DRAFT,
     catatan: f.catatan,
+    lampiran: f.lampiran ?? "",
     totalKontribusi: agg.totalKontribusi,
     totalReturn: agg.totalReturn,
     jumlahInvestor: agg.jumlahInvestor,
@@ -272,6 +279,13 @@ export interface FundingInput {
   jatuhTempo?: string;
   status?: string;
   catatan?: string;
+  /**
+   * Lampiran (object key). Tri-state:
+   * - `undefined` → jangan ubah (mode edit tanpa ganti berkas)
+   * - `null`      → hapus lampiran
+   * - `string`    → pasang object key baru
+   */
+  lampiran?: string | null;
 }
 
 export async function saveFunding(data: FundingInput, actor: string): Promise<FundingDTO> {
@@ -302,10 +316,23 @@ export async function saveFunding(data: FundingInput, actor: string): Promise<Fu
     jatuhTempo: toDateString(data.jatuhTempo) || null,
     status,
     catatan: data.catatan ?? "",
+    ...(data.lampiran === undefined ? {} : { lampiran: data.lampiran }),
   };
 
   if (data.id) {
+    const cur = await db
+      .select({ lampiran: fundings.lampiran })
+      .from(fundings)
+      .where(eq(fundings.id, data.id))
+      .limit(1);
     await db.update(fundings).set(payload).where(eq(fundings.id, data.id));
+
+    // Bersihkan objek lama bila lampiran diganti atau dikosongkan.
+    const oldKey = cur[0]?.lampiran ?? null;
+    if (data.lampiran !== undefined && oldKey && oldKey !== data.lampiran) {
+      await removeObjectQuietly(oldKey);
+    }
+
     await logAudit({ aksi: "UPDATE", sheet: "Fundings", recordId: data.id, detail: nama, user: actor });
     return (await listFundings()).find((f) => f.id === data.id)!;
   }
@@ -329,8 +356,22 @@ export async function deleteFunding(id: string, actor: string): Promise<boolean>
     await tx.delete(fundingReturns).where(eq(fundingReturns.fundingId, id));
     await tx.delete(fundings).where(eq(fundings.id, id));
   });
+  await removeObjectQuietly(detail.funding.lampiran);
   await logAudit({ aksi: "DELETE", sheet: "Fundings", recordId: id, user: actor });
   return true;
+}
+
+/**
+ * Hapus objek lampiran tanpa menggagalkan operasi utama. Kegagalan S3 hanya
+ * dicatat ke log server (data DB tetap konsisten).
+ */
+async function removeObjectQuietly(key: string | null | undefined): Promise<void> {
+  if (!key || !isStorageConfigured()) return;
+  try {
+    await deleteObject(key);
+  } catch (err) {
+    console.error(`Gagal menghapus lampiran funding "${key}":`, err);
+  }
 }
 
 /**
@@ -614,6 +655,7 @@ export async function listFundingsForInvestor(investorId: string): Promise<Fundi
         labaSaya,
         jumlahProyek: projList.length,
         proyekList: projList.map((p) => ({ id: p.id, nama: p.nama, status: p.status })),
+        lampiran: f.lampiran ?? "",
       };
     });
 }

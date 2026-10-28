@@ -1,0 +1,1 @@
+ALTER TABLE "fundings" ADD COLUMN "lampiran" text;

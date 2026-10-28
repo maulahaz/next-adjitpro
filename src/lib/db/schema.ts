@@ -168,6 +168,12 @@ export const fundings = pgTable(
     /** 'Draft' | 'Berjalan' | 'Lunas' | 'Dibatalkan' */
     status: text("status").notNull().default("Draft"),
     catatan: text("catatan").notNull().default(""),
+    /**
+     * Object key lampiran pada Neon Object Storage (S3-compatible),
+     * mis. `fundings/<uuid>/berkas.pdf`. Nullable — lampiran opsional.
+     * Berkas hanya dapat diunduh lewat route berautentikasi.
+     */
+    lampiran: text("lampiran"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => ({
