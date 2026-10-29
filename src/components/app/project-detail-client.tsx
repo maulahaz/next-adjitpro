@@ -382,7 +382,7 @@ export function ProjectDetailClient({
           <DataTable
             bordered={false}
             searchPlaceholder="Cari entri ledger…"
-            emptyMessage="Belum ada entri ledger. Entri diisi oleh peran client dari menu Proyek Saya."
+            emptyMessage="Belum ada entri ledger dari Client"
             head={
               <TableRow>
                 <TableHead className="w-12 text-center">No</TableHead>

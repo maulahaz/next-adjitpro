@@ -13,6 +13,11 @@ import { db } from "@/lib/db";
 import { projectLedgers, projects } from "@/lib/db/schema";
 import { LEDGER_TIPE, STATUS } from "@/lib/constants";
 import { todayStr, toDateString } from "@/lib/domain/dates";
+import {
+  LEDGER_IMPORT_MAX_ROWS,
+  parseLedgerDate,
+  type LedgerImportRow,
+} from "@/lib/domain/ledger-csv";
 import { parseMoneyInput } from "@/lib/domain/money";
 import { AppError } from "@/lib/errors";
 import { logAudit } from "./audit";
@@ -155,6 +160,71 @@ export async function deleteProjectLedger(
   await db.delete(projectLedgers).where(eq(projectLedgers.id, id));
   await logAudit({ aksi: "DELETE", sheet: "ProjectLedger", recordId: String(id), user: actor });
   return true;
+}
+
+/**
+ * Import banyak entri ledger sekaligus (mode **tambahkan**). All-or-nothing:
+ * bila satu baris gagal validasi, tidak ada yang disimpan.
+ *
+ * Hanya untuk proyek milik pihak ketiga `scope` dan proyek belum `Ditutup`.
+ */
+export async function importProjectLedgers(
+  projectId: string,
+  rows: LedgerImportRow[],
+  actor: string,
+  scope: LedgerScope,
+): Promise<{ imported: number }> {
+  const id = String(projectId ?? "").trim();
+  if (!id) throw new AppError("Proyek wajib dipilih.");
+
+  const project = await assertOwnedProject(id, scope.thirdPartyId);
+  if (project.status === STATUS.PROYEK_DITUTUP) {
+    throw new AppError(
+      "Proyek sudah ditutup. Ledger tidak bisa diubah. Hubungi Admin untuk info detail.",
+    );
+  }
+  if (!rows.length) throw new AppError("Tidak ada entri ledger yang bisa diimpor.");
+  if (rows.length > LEDGER_IMPORT_MAX_ROWS) {
+    throw new AppError(`Maksimal ${LEDGER_IMPORT_MAX_ROWS} baris per import.`);
+  }
+
+  // Validasi ulang di server — jangan percaya hasil parsing di browser.
+  const payload = rows.map((row, index) => {
+    const tanggal = parseLedgerDate(row.tanggal);
+    if (!tanggal) {
+      throw new AppError(`Baris ${index + 1}: tanggal tidak valid.`);
+    }
+    const nominal = Number(row.nominal);
+    if (!Number.isFinite(nominal) || nominal <= 0) {
+      throw new AppError(`Baris ${index + 1}: nominal harus lebih dari 0.`);
+    }
+    return {
+      projectId: id,
+      tanggal,
+      deskripsi: String(row.deskripsi ?? ""),
+      jenis: row.jenis === LEDGER_TIPE.KREDIT ? LEDGER_TIPE.KREDIT : LEDGER_TIPE.DEBET,
+      nominal: Math.round(nominal),
+      keterangan: String(row.keterangan ?? ""),
+    };
+  });
+
+  await db.transaction(async (tx) => {
+    await tx.insert(projectLedgers).values(payload);
+    // Proyek Draft yang mulai diisi Ledger berubah menjadi Berjalan.
+    if (project.status === STATUS.PROYEK_DRAFT) {
+      await tx.update(projects).set({ status: STATUS.PROYEK_BERJALAN }).where(eq(projects.id, id));
+    }
+  });
+
+  await logAudit({
+    aksi: "IMPORT",
+    sheet: "ProjectLedger",
+    recordId: id,
+    detail: `${payload.length} entri`,
+    user: actor,
+  });
+
+  return { imported: payload.length };
 }
 
 /* ============================ INTERNAL ============================ */

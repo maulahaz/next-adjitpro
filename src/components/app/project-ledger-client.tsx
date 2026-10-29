@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Field, SelectInput } from "@/components/app/field";
 import { FormDialog, ConfirmDialog } from "@/components/app/form-dialog";
+import { LedgerImportDialog } from "@/components/app/ledger-import-dialog";
 import { DataTable } from "@/components/app/data-table";
 import { StatCard } from "@/components/app/ui-helpers";
 import { TableCell, TableHead, TableRow } from "@/components/ui/table";
@@ -64,17 +65,20 @@ export function ProjectLedgerClient({
             bordered={false}
             toolbar={
               readOnly ? null : (
-                <FormDialog
-                  trigger={
-                    <Button size="sm">
-                      <Plus className="h-4 w-4" /> Entri Ledger
-                    </Button>
-                  }
-                  title="Tambah Entri Ledger"
-                  action={saveLedgerAction}
-                >
-                  <LedgerFields projectId={projectId} />
-                </FormDialog>
+                <div className="flex flex-wrap items-center gap-2">
+                  <LedgerImportDialog projectId={projectId} />
+                  <FormDialog
+                    trigger={
+                      <Button size="sm">
+                        <Plus className="h-4 w-4" /> Entri Ledger
+                      </Button>
+                    }
+                    title="Tambah Entri Ledger"
+                    action={saveLedgerAction}
+                  >
+                    <LedgerFields projectId={projectId} />
+                  </FormDialog>
+                </div>
               )
             }
             searchPlaceholder="Cari entri (deskripsi/keterangan)…"
