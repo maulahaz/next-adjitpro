@@ -202,9 +202,12 @@ export async function listUsableFundingOptions(
   if (!all.length) return [];
   const agrs = await tx.select().from(investAgreements);
   const withAgreement = new Set(agrs.map((a) => a.fundingId));
+  // Hanya tampilkan Funding yang statusnya `Release` DAN sudah ada aturan bagi hasil.
   // return all.filter((f) => f.status === STATUS.FUND_RELEASE && withAgreement.has(f.id));
   // Hanya tampilkan Funding yang statusnya `Release` atau `Berjalan` (bisa dipakai client) DAN sudah ada aturan bagi hasil.
-  return all.filter((f) => (f.status === STATUS.FUND_RELEASE) && withAgreement.has(f.id) || f.status === STATUS.FUND_BERJALAN);
+  // return all.filter((f) => (f.status === STATUS.FUND_RELEASE) && withAgreement.has(f.id) || f.status === STATUS.FUND_BERJALAN);
+  // Hanya tampilkan Funding yang statusnya `Release` atau `Berjalan`.
+  return all.filter((f) => (f.status === STATUS.FUND_RELEASE || f.status === STATUS.FUND_BERJALAN));
 }
 
 export async function getFundingDetail(id: string, tx: DbOrTx = db): Promise<FundingDetailDTO> {
