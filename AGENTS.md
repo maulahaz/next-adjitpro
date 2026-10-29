@@ -24,13 +24,18 @@ Database / migration:
 ```powershell
 npm run db:generate    # after editing src/lib/db/schema.ts, generate a migration into drizzle/
 npm run db:migrate     # apply migrations (use this in prod — NOT db:push)
-npm run db:seed        # idempotent default admin
-npm run db:reset       # DESTRUCTIVE, dev only
+npm run db:seed        # idempotent default admin (tidak menimpa data yang ada)
+npm run db:reset       # DESTRUCTIVE, dev only — WAJIB konfirmasi user dulu
 npm run migrate:legacy -- --dir "<csv folder>" [--wipe] [--dry-run]
 ```
 
 Gotchas:
 
+- **WAJIB minta konfirmasi user sebelum reset/seed ulang DB.** `npm run db:seed` sendiri
+  idempoten, tetapi "seed ulang" biasanya didahului `db:reset`, `migrate:legacy --wipe`, atau
+  `TRUNCATE`. Jangan pernah menjalankan operasi yang menghapus/mengganti isi tabel tanpa
+  persetujuan eksplisit dari user. Tanyakan dulu apakah DB berisi data terbaru dan sudah
+  dibackup; jika ragu, gunakan `--dry-run` atau minta user menyiapkan backup terlebih dahulu.
 - **`npm test` is destructive when `DATABASE_URL` is set.** The integration suite's `beforeAll`
   `TRUNCATE`s every table (including the seeded admin). Never run it against a DB with data you
   care about. Integration tests auto-skip when `DATABASE_URL` is unset.
