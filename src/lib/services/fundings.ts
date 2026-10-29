@@ -189,8 +189,10 @@ export async function listFundingOptions(
 /**
  * Opsi Funding yang **siap dipakai client** pada form proyek:
  * status `Release` (di-set manual Admin/Operator) DAN aturan bagi hasil
- * (`invest_agreements`) sudah dibuat. Selama belum `Release`, nama Funding
+ * (`invest_agreements`) sudah dibuat. Selama belum `Release` atau `Berjalan`, nama Funding
  * tidak ditampilkan ke client.
+ * Release = Dana Komplit + Aturan bagi hasil sudah ada. 
+ * Berjalan = Release + Proyek sudah jalan.
  */
 export async function listUsableFundingOptions(
   thirdPartyId?: string,
@@ -202,7 +204,7 @@ export async function listUsableFundingOptions(
   const withAgreement = new Set(agrs.map((a) => a.fundingId));
   // return all.filter((f) => f.status === STATUS.FUND_RELEASE && withAgreement.has(f.id));
   // Hanya tampilkan Funding yang statusnya `Release` atau `Berjalan` (bisa dipakai client) DAN sudah ada aturan bagi hasil.
-  return all.filter((f) => (f.status === STATUS.FUND_RELEASE || f.status === STATUS.FUND_BERJALAN) && withAgreement.has(f.id));
+  return all.filter((f) => (f.status === STATUS.FUND_RELEASE) && withAgreement.has(f.id) || f.status === STATUS.FUND_BERJALAN);
 }
 
 export async function getFundingDetail(id: string, tx: DbOrTx = db): Promise<FundingDetailDTO> {
