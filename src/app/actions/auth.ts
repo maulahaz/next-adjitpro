@@ -18,7 +18,7 @@ export async function loginAction(_prev: ActionState, formData: FormData): Promi
       { username: str(formData, "username"), password: String(formData.get("password") ?? "") },
       { userAgent: h.get("user-agent") ?? "" },
     );
-    console.log("loginAction result:", result);
+    // console.log("loginAction result:", result);
   } catch (err) {
     return errorState(err);
   }

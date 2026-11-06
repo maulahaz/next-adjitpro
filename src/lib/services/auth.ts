@@ -42,7 +42,7 @@ export async function login(
 
   const rows = await db.select().from(users).where(eq(users.username, username)).limit(1);
   const user = rows[0];
-  console.log("Users:", user);
+  // console.log("Logged Users:", user);
 
   if (!user) {
     await registerFailedLogin(username);
